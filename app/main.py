@@ -21,21 +21,15 @@ async def read_root():
     logger.info("Root endpoint accessed")
     return {"message": "Welcome to the Park"}
 
-@app.post("/secure/v1/chat", response_model=ChatResponse)
-async def secure_chat_endpoint(
-    request_data: ChatRequest,
-    # The current_user variable will contain the decoded JWT payload
-    # if token verification is successful.
-    # You can type hint it more specifically if you know the payload structure,
-    # e.g., current_user: Dict = Depends(verify_supabase_token)
-    # For now, we'll just ensure it's authenticated.
-    user = Depends(verify_supabase_token) # Use underscore if payload isn't directly used in this handler
+@app.post("/v1/chat", response_model=ChatResponse)
+async def chat(
+    request_data: ChatRequest
 ):
     """
     Protected endpoint to chat with AI models.
     Requires a valid Supabase JWT in the Authorization header.
     """
-    logger.info(f"Received chat request from user: {user.get('sub', 'unknown')} with prompt: {request_data.prompt}")
+    
     try:
         ai_reply = await call_gemini_chat(request_data.prompt)
 

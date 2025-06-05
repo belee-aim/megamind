@@ -1,4 +1,4 @@
-# Park for Gemini
+# AI Park for Swift Trader
 
 To get started create a virtual env and download the dependencies
 
