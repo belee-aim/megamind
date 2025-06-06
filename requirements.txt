@@ -5,3 +5,6 @@ pydantic-settings
 python-jose[cryptography]
 google-genai
 python-dotenv
+langgraph
+langsmith
+langchain[google-genai]
