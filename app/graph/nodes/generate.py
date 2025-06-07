@@ -1,4 +1,4 @@
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, ToolMessage, AIMessage # Added AIMessage
 from langchain_core.documents import Document
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -48,17 +48,13 @@ def generate_node(state: AgentState):
     # Create the LLM instance (replace with actual API key handling)
     # from app.config import settings # Assuming settings object has google_api_key
     # llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20", google_api_key=settings.google_api_key, streaming=True)
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20", streaming=True) # Placeholder for API key
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20") # Placeholder for API key
 
     # Create the chain and invoke it
     chain = prompt | llm
 
-    # Stream the response
-    response = ""
-    for chunk in chain.stream({"documents": document_context, "question": question}):
-        response += str(chunk.content)
-        yield str(chunk.content) # Yield each chunk for streaming
+    # Invoke the chain to get the complete response
+    response = chain.invoke({"documents": document_context, "question": question})
 
-    # Update the state with the final response (optional, depending on graph structure)
-    # state["messages"].append(("ai", response))
-    # return state # Or return the final response in a different key if needed
+    # Return a dictionary to update the state with the final response
+    return {"messages": [AIMessage(content=response.content)]}

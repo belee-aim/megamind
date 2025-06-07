@@ -10,4 +10,4 @@ langsmith
 langchain[google-genai]
 langchain_community
 psycopg[binary]
-sentence-transformers
+tiktoken

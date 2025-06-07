@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
+from langgraph.prebuilt import ToolNode, tools_condition # Added tools_condition
 
 from .state import AgentState
-from .nodes import generate_node # retrieve_node will be replaced by ToolNode
+from .nodes import generate_node, agent_node # Removed stream_node
 from .tools.retriever import get_retriever_tool
 
 def build_graph():
@@ -12,19 +12,27 @@ def build_graph():
     workflow = StateGraph(AgentState)
 
     # Add nodes
-    workflow.add_node("retrieve", ToolNode([get_retriever_tool()]))
-    workflow.add_node("generate", generate_node)
-    # Add other nodes here as needed
+    workflow.add_node("agent", agent_node) # New agent node
+    workflow.add_node("retrieve", ToolNode([get_retriever_tool()])) # ToolNode for retrieval
+    workflow.add_node("generate", generate_node) # Generate response node
 
-    # Set the entry point
-    workflow.set_entry_point("retrieve")
+    workflow.set_entry_point("agent") 
+
+    # Add conditional edge from agent: decide whether to call tool or end
+    workflow.add_conditional_edges(
+        "agent",
+        tools_condition, # Use tools_condition to check for tool calls
+        {
+            "tools": "retrieve", # If tool calls, go to retrieve (ToolNode)
+            END: END, # If no tool calls, end (LLM responded directly)
+        },
+    )
 
     # Add edges
-    # The ToolNode will return a list of ToolMessages, which will be added to the state.
-    # The 'generate' node will then need to process these ToolMessages.
+    # After retrieve (ToolNode), go to generate
     workflow.add_edge("retrieve", "generate")
+    # After generate, end the graph
     workflow.add_edge("generate", END)
-    # Add edges between nodes here as needed
 
     # Compile the graph
     app = workflow.compile()
