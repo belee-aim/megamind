@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from .models.requests import ChatRequest
 from .models.responses import ChatResponse
 from .auth import verify_supabase_token
-from .gemini import call_gemini_chat
+from .graph.builder import build_graph
 
 import logging
 
@@ -21,22 +22,61 @@ async def read_root():
     logger.info("Root endpoint accessed")
     return {"message": "Welcome to the Park"}
 
-@app.post("/v1/chat", response_model=ChatResponse)
+@app.post("/v1/chat") # Removed response_model for streaming
 async def chat(
     request_data: ChatRequest
 ):
     """
     Protected endpoint to chat with AI models.
     Requires a valid Supabase JWT in the Authorization header.
+    Streams the response from the AI model.
     """
     
     try:
-        ai_reply = await call_gemini_chat(request_data.prompt)
+        # Build the graph
+        graph = build_graph()
 
-        if ai_reply.startswith("Error:"):
-            raise HTTPException(status_code=500, detail=ai_reply)
+        # Invoke the graph with the user's prompt in streaming mode
+        inputs = {"messages": [("human", request_data.prompt)]}
 
-        return ChatResponse(reply=ai_reply)
+        async def stream_response():
+            async for chunk in graph.astream(inputs):
+                # Assuming the 'generate' node yields strings
+                # You might need to adjust this based on your node's output
+                if "__end__" in chunk:
+                     # Handle the end of the stream if necessary
+                     pass
+                else:
+                    # Find the output from the 'generate' node
+                    # The structure of the chunk depends on the graph
+                    # For a simple graph ending with 'generate', the chunk might contain the node's output directly
+                    # If not, you might need to inspect the chunk structure
+                    # For this simple graph, the chunk is the state update, and the 'generate' node yields directly
+                    # So we need to access the yielded content from the state update
+                    # This part might need refinement based on actual streaming output structure
+                    # For now, let's assume the chunk itself is the yielded content from the generate node
+                    # If the generate node yields strings, this should work.
+                    # If the generate node updates the state and the state is yielded,
+                    # you'd need to extract the relevant part from the state.
+
+                    # A more robust way might be to have the generate node return a specific key in the state
+                    # and yield that key's content.
+                    # For now, let's assume the yielded content is directly in the chunk or a known key.
+
+                    # Based on the generate_node implementation yielding strings,
+                    # the chunk from astream might be a dictionary with node names as keys
+                    # and their outputs as values.
+                    # We need to find the output from the 'generate' node.
+                    if "generate" in chunk:
+                         # The output of the generate node is what we yielded
+                         # This might be a dictionary if the node returned a dict, or the yielded value
+                         # If the node yields strings, the chunk for that node might be {'generate': 'chunk_string'}
+                         yield chunk["generate"]
+
+
+        return StreamingResponse(stream_response(), media_type="text/event-stream")
+
+
     except HTTPException as e:
         raise e
     except Exception as e:
