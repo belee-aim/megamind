@@ -121,3 +121,6 @@ dmypy.json
 
 # Cline Docs
 docs/
+
+# Image of the graph
+images/

@@ -14,3 +14,9 @@ Run the server in dev mode
 ```bash
 fastapi dev app/main.py
 ```
+
+To generate image of the graph  
+
+```bash
+ python app/utils/generate_graph_image.py
+```
