@@ -11,3 +11,4 @@ langchain[google-genai]
 langchain_community
 psycopg[binary]
 tiktoken
+requests

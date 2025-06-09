@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 
-from .config import settings
+from .utils.config import settings
 
 ALGORITHM = "HS256"
 oauth2_scheme = HTTPBearer()

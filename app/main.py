@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage # Added AIMessage
+from langchain_core.messages import AIMessage, HumanMessage # Added AIMessage
 
 from .models.requests import ChatRequest
 from .models.responses import ChatResponse
@@ -40,7 +40,7 @@ async def chat(
         # Invoke the graph to get the final state
         user_id = "12345" # Placeholder for user ID
         inputs = {
-            "messages": [("human", request_data.question)],
+            "messages": [HumanMessage(content=request_data.question)],
             "user_id": user_id,
             "question": request_data.question,
         }
