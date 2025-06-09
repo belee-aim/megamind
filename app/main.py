@@ -23,7 +23,7 @@ async def read_root():
     logger.info("Root endpoint accessed")
     return {"message": "Welcome to the Park"}
 
-@app.post("/v1/chat") # Removed response_model for streaming
+@app.post("/api/v1/chat") 
 async def chat(
     request_data: ChatRequest
 ):
@@ -38,14 +38,20 @@ async def chat(
         graph = build_graph()
 
         # Invoke the graph to get the final state
-        inputs = {"messages": [("human", request_data.prompt)]}
+        user_id = "12345" # Placeholder for user ID
+        inputs = {
+            "messages": [("human", request_data.question)],
+            "user_id": user_id,
+            "question": request_data.question,
+        }
 
         async def stream_response():
             
-            async for chunk in graph.astream(inputs, stream_mode="messages"):
-                token, _ = chunk
-                if isinstance(token, AIMessage):
-                    yield f"data: {token.content}\n\n"
+            async for chunk in graph.astream(inputs):
+                if "messages" in chunk:
+                    last_message = chunk["messages"][-1]
+                    if isinstance(last_message, AIMessage):
+                        yield f"data: {last_message.content}\n\n"
 
         return StreamingResponse(stream_response(), media_type="text/event-stream")
 

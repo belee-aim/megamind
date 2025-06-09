@@ -1,9 +1,10 @@
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode, tools_condition # Added tools_condition
 
 from .state import AgentState
-from .nodes import generate_node, agent_node # Removed stream_node
-from .tools.retriever import get_retriever_tool
+from .nodes.generate import generate_node
+from .nodes.check_cache import check_cache_node, should_retrieve_from_frappe
+from .nodes.frappe_retriever import frappe_retriever_node
+from .nodes.embedder import embedder_node
 
 def build_graph():
     """
@@ -12,26 +13,27 @@ def build_graph():
     workflow = StateGraph(AgentState)
 
     # Add nodes
-    workflow.add_node("agent", agent_node) # New agent node
-    workflow.add_node("retrieve", ToolNode([get_retriever_tool()])) # ToolNode for retrieval
-    workflow.add_node("generate", generate_node) # Generate response node
+    workflow.add_node("check_cache", check_cache_node)
+    workflow.add_node("retrieve_from_frappe", frappe_retriever_node)
+    workflow.add_node("process_and_embed", embedder_node)
+    workflow.add_node("generate", generate_node)
 
-    workflow.set_entry_point("agent") 
+    # Set the entry point
+    workflow.set_entry_point("check_cache")
 
-    # Add conditional edge from agent: decide whether to call tool or end
+    # Add conditional edges
     workflow.add_conditional_edges(
-        "agent",
-        tools_condition, # Use tools_condition to check for tool calls
+        "check_cache",
+        should_retrieve_from_frappe,
         {
-            "tools": "retrieve", # If tool calls, go to retrieve (ToolNode)
-            END: END, # If no tool calls, end (LLM responded directly)
+            "retrieve_from_frappe": "retrieve_from_frappe",
+            "process_and_embed": "process_and_embed",
         },
     )
 
     # Add edges
-    # After retrieve (ToolNode), go to generate
-    workflow.add_edge("retrieve", "generate")
-    # After generate, end the graph
+    workflow.add_edge("retrieve_from_frappe", "process_and_embed")
+    workflow.add_edge("process_and_embed", "generate")
     workflow.add_edge("generate", END)
 
     # Compile the graph
