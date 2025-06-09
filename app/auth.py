@@ -25,7 +25,7 @@ async def verify_supabase_token(token: HTTPAuthorizationCredentials = Security(o
         exp = payload.get("exp")
         if exp is None:
             raise credentials_exception # No expiration time
-        if datetime.utcfromtimestamp(exp) < datetime.utcnow():
+        if datetime.fromtimestamp(exp) < datetime.now():
             raise credentials_exception # Token expired
             
         # You can add more checks here if needed, e.g., specific roles or claims

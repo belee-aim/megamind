@@ -1,4 +1,4 @@
-# AI Park for Swift Trader
+# Megamind of AIMLink
 
 To get started create a virtual env and download the dependencies
 
