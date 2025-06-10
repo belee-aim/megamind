@@ -13,3 +13,4 @@ psycopg[binary]
 langchain-postgres
 tiktoken
 requests
+supabase
