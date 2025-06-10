@@ -4,7 +4,6 @@ from langchain_core.messages import AIMessage, HumanMessage # Added AIMessage
 
 from .models.requests import ChatRequest
 from .models.responses import ChatResponse
-from .auth import verify_supabase_token
 from .graph.builder import build_graph
 
 import logging
@@ -28,8 +27,7 @@ async def chat(
     request_data: ChatRequest
 ):
     """
-    Protected endpoint to chat with AI models.
-    Requires a valid Supabase JWT in the Authorization header.
+    Endpoint to chat with AI models.
     Streams the response from the AI model.
     """
     

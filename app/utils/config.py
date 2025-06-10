@@ -5,7 +5,6 @@ load_dotenv()
 
 class Settings(BaseSettings):
     google_api_key: str
-    supabase_jwt_secret: str
     frappe_url: str
     frappe_api_key: str
     frappe_api_secret: str

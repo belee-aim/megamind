@@ -10,5 +10,6 @@ langsmith
 langchain[google-genai]
 langchain_community
 psycopg[binary]
+langchain-postgres
 tiktoken
 requests
