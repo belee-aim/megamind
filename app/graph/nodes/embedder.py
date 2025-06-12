@@ -1,4 +1,4 @@
-from ..state import AgentState
+from ..states import AgentState
 
 def embedder_node(state: AgentState):
     """

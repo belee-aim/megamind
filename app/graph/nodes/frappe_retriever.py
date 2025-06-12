@@ -1,4 +1,4 @@
-from ..state import AgentState
+from ..states import AgentState
 from langchain_core.documents import Document
 from app.clients.frappe_client import FrappeClient
 

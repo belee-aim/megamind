@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 
-from ..state import AgentState
+from ..states import AgentState
 
 def generate_node(state: AgentState):
     """
