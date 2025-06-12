@@ -63,7 +63,7 @@ This file manages the application's configuration, including loading environment
 ```mermaid
 graph TD
     A[User Request: /api/v1/chat] --> B{src/megamind/main.py};
-    B --> C{src/megamind/graph/builder.py: build_graph()};
+    B --> C{src/megamind/graph/builder.py: build_graph};
     C --> D[StateGraph];
     D -- Entry Point --> E{check_cache_node};
     E -- Should Retrieve from Frappe? --> F{Yes};
