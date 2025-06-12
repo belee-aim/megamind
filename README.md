@@ -6,7 +6,8 @@ To get started create a virtual env and download the dependencies
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt -U
+pip install poetry
+poetry install
 ```
 
 Run the server in dev mode
