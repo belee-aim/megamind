@@ -1,5 +1,5 @@
 import os
-from app.graph.builder import build_graph
+from src.megamind.graph.builder import build_graph
 from IPython.display import Image, display
 
 if __name__ == "__main__":

@@ -11,7 +11,6 @@ def generate_node(state: AgentState):
     """
     print("---GENERATE NODE---")
     question = state["question"]
-    vector_store = state["vector_store"]
 
     # Placeholder for retriever
     # In a real implementation, you would use the vector_store to retrieve relevant documents

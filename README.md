@@ -19,5 +19,5 @@ fastapi dev src/megamind
 To generate image of the graph  
 
 ```bash
- python app/utils/generate_graph_image.py
+ python generate_graph_image.py
 ```
