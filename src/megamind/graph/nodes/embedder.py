@@ -2,7 +2,7 @@ from langchain_community.vectorstores.supabase import SupabaseVectorStore
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from megamind.utils.config import get_supabase_client
+from megamind.clients.supa_client import get_supabase_client
 from ..states import AgentState
 
 def embedder_node(state: AgentState):
