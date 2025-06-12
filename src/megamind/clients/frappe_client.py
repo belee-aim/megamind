@@ -1,5 +1,5 @@
 import requests
-from app.utils.config import settings
+from ..utils.config import settings
 
 class FrappeClient:
     def __init__(self):
@@ -20,9 +20,9 @@ class FrappeClient:
 
         try:
             response = requests.get(
-                f"{self.frappe_url}/api/resource/File",
+                f"{self.frappe_url}/api/method/drive.api.list.files",
                 headers=self.headers,
-                params={"fields": '["file_name", "file_url"]'}
+                # params={"fields": '["file_name", "file_url"]'}
             )
             response.raise_for_status()
             return response.json().get("data", [])

@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage, HumanMessage # Added AIMessage
 
 from .models.requests import ChatRequest
 from .models.responses import ChatResponse
-from .graph.builder import build_graph
+from .graph import graph
 
 import logging
 
@@ -32,9 +32,6 @@ async def chat(
     """
     
     try:
-        # Build the graph
-        graph = build_graph()
-
         # Invoke the graph to get the final state
         user_id = "12345" # Placeholder for user ID
         inputs = {

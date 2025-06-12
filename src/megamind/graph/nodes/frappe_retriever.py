@@ -1,6 +1,6 @@
 from ..states import AgentState
 from langchain_core.documents import Document
-from app.clients.frappe_client import FrappeClient
+from ...clients.frappe_client import FrappeClient
 
 def frappe_retriever_node(state: AgentState):
     """
