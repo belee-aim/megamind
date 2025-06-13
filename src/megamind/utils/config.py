@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
-load_dotenv()  
+load_dotenv(override=True)  
 
 class Settings(BaseSettings):
     google_api_key: str

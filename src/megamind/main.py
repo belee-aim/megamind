@@ -1,12 +1,15 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage # Added AIMessage
+from pydantic import BaseModel
 
-from .models.requests import ChatRequest
-from .models.responses import ChatResponse
 from .graph import graph
 
+
 import logging
+
+class ChatRequest(BaseModel):
+    question: str
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
