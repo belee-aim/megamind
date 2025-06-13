@@ -38,9 +38,9 @@ This file defines the state object for the agent.
 
 This directory contains the functions that define the logic for each node in the graph.
 
--   **`check_cache.py`**: The `check_cache_node` function checks if a similar question has been answered before and is available in the cache.
--   **`frappe_retriever.py`**: The `frappe_retriever_node` function retrieves data from the Frappe API based on the user's query.
--   **`embedder.py`**: The `embedder_node` function processes the data retrieved from Frappe and creates embeddings for it.
+-   **`check_cache.py`**: The `check_cache_node` function retrieves all teams for the user, checks if a similar question has been answered before for each team, and is available in the cache.
+-   **`frappe_retriever.py`**: The `frappe_retriever_node` function retrieves data from the Frappe API for all teams. It uses the `DoclingLoader` to handle different file types.
+-   **`embedder.py`**: The `embedder_node` function processes the data retrieved from Frappe, cleans the content, and creates embeddings for it.
 -   **`generate.py`**: The `generate_node` function is responsible for generating the final response. It takes the retrieved documents and the conversation history as input and uses a language model to generate a coherent and contextually relevant answer.
 
 ### `src/megamind/clients/frappe_client.py`
