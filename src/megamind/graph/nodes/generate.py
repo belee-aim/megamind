@@ -19,7 +19,7 @@ def generate_node(state: AgentState):
     
     # Create a prompt template
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful AI assistant. Use the following documents to answer the user's question:\n\n{documents}"),
+        ("system", "You are a helpful AI assistant. Only use the following documents to answer the user's question:\n\n{documents}"),
         ("human", "{question}")
     ])
 
@@ -27,7 +27,7 @@ def generate_node(state: AgentState):
     document_context = "\n".join([doc.page_content for doc in documents])
 
     # Create the LLM instance (replace with actual API key handling)
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20") # Placeholder for API key
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20") 
 
     # Create the chain and invoke it
     chain = prompt | llm

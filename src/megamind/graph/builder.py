@@ -27,7 +27,7 @@ def build_graph():
         should_retrieve_from_frappe,
         {
             "retrieve_from_frappe": "retrieve_from_frappe",
-            "process_and_embed": "process_and_embed",
+            "generate": "generate",
         },
     )
 

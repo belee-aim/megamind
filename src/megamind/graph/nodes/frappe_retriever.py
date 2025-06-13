@@ -1,30 +1,54 @@
+import tempfile
 from ..states import AgentState
-from langchain_core.documents import Document
 from ...clients.frappe_client import FrappeClient
+from langchain_docling.loader import DoclingLoader
+
+SUPPORTED_MIMETYPES = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/markdown",
+    "text/asciidoc",
+    "text/html",
+    "text/csv",
+    "image/png",
+    "image/jpeg",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+]
 
 def frappe_retriever_node(state: AgentState):
     """
     Retrieves documents from Frappe Drive.
     """
     print("---RETRIEVING DOCUMENTS FROM FRAPPE DRIVE---")
-    user_id = state["user_id"]
+    team_ids = state["team_ids"]
     
     frappe_client = FrappeClient()
-    teams = frappe_client.get_teams()
     
     documents = []
-    for team in teams.values():
-        files = frappe_client.get_files(team=team.get("name"))
+    for team_id in team_ids:
+        files = frappe_client.get_files(team=team_id)
         for file in files:
-            content = frappe_client.get_file_content(file.get("name"))
-            if content:
-                documents.append(
-                    Document(
-                        page_content=content,
-                        metadata={"source": "frappe", "file_name": file.get("file_name")}
-                    )
-                )
+            if file.get("mime_type") in SUPPORTED_MIMETYPES:
+                file_path = file.get("path", "")
+                file_extension = f".{file_path.split('.')[-1]}" if "." in file_path else ""
+                with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+                    raw_content = frappe_client.get_file_content(file.get("name"))
+                    if raw_content:
+                        temp_file.write(raw_content)
+                        temp_file_path = temp_file.name
+                
+                loader = DoclingLoader(temp_file_path)
+                loaded_documents = loader.load()
+                for doc in loaded_documents:
+                    doc.metadata["source"] = "frappe"
+                    doc.metadata["file_name"] = file.get("name")
+                    doc.metadata["team_id"] = team_id
+                documents.extend(loaded_documents)
 
-    print(f"Retrieved {len(documents)} documents for user {user_id} from Frappe Drive.")
+    print(f"Retrieved {len(documents)} documents for teams {team_ids} from Frappe Drive.")
     
     return {"documents": documents}

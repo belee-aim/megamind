@@ -7,7 +7,7 @@ class AgentState(TypedDict):
     """Represents the state of our agent."""
 
     messages: Annotated[List[AnyMessage], add_messages]
-    user_id: str
+    team_ids: List[str]
     question: str
     documents: List[Document]
     vector_store: Any

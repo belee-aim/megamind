@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, Text
-from sqlalchemy.dialects.postgresql import JSONB
+import uuid
+from sqlalchemy import Column, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import declarative_base
 from pgvector.sqlalchemy import Vector
 
@@ -8,7 +9,8 @@ Base = declarative_base()
 class Document(Base):
     __tablename__ = "documents"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     content = Column(Text, nullable=False)
-    meta = Column(JSONB, nullable=False)
-    embedding = Column(Vector(1536))
+    embedding = Column(Vector(768))
+
+Document.metadata = Column(JSONB, nullable=False)

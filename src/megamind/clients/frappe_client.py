@@ -78,7 +78,7 @@ class FrappeClient:
                 params=params
             )
             file_response.raise_for_status()
-            return file_response.text
+            return file_response.content
         except requests.exceptions.RequestException as e:
             print(f"Error fetching file content: {e}")
             return None

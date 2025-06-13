@@ -12,6 +12,10 @@ def embedder_node(state: AgentState):
     print("---PROCESSING AND EMBEDDING DOCUMENTS---")
     documents = state["documents"]
     
+    # Clean documents
+    for doc in documents:
+        doc.page_content = doc.page_content.replace("\x00", "")
+
     # Chunk documents
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunked_documents = text_splitter.split_documents(documents)

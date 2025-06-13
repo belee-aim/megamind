@@ -36,18 +36,16 @@ async def chat(
     
     try:
         # Invoke the graph to get the final state
-        user_id = "12345" # Placeholder for user ID
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
-            "user_id": user_id,
             "question": request_data.question,
         }
 
         async def stream_response():
             
             async for chunk in graph.astream(inputs):
-                if "messages" in chunk:
-                    last_message = chunk["messages"][-1]
+                if "generate" in chunk:
+                    last_message = chunk["generate"]["messages"][-1]
                     if isinstance(last_message, AIMessage):
                         yield f"data: {last_message.content}\n\n"
 
