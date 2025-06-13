@@ -35,19 +35,26 @@ def frappe_retriever_node(state: AgentState):
             if file.get("mime_type") in SUPPORTED_MIMETYPES:
                 file_path = file.get("path", "")
                 file_extension = f".{file_path.split('.')[-1]}" if "." in file_path else ""
-                with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+                try:
                     raw_content = frappe_client.get_file_content(file.get("name"))
                     if raw_content:
-                        temp_file.write(raw_content)
-                        temp_file_path = temp_file.name
-                
-                loader = DoclingLoader(temp_file_path)
-                loaded_documents = loader.load()
-                for doc in loaded_documents:
-                    doc.metadata["source"] = "frappe"
-                    doc.metadata["file_name"] = file.get("name")
-                    doc.metadata["team_id"] = team_id
-                documents.extend(loaded_documents)
+                        file_path = file.get("path", "")
+                        file_extension = f".{file_path.split('.')[-1]}" if "." in file_path else ""
+                        temp_file_path = None
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+                            temp_file.write(raw_content)
+                            temp_file_path = temp_file.name
+                        
+                        loader = DoclingLoader(temp_file_path)
+                        loaded_documents = loader.load()
+                        for doc in loaded_documents:
+                            doc.metadata["source"] = "frappe"
+                            doc.metadata["file_name"] = file.get("name")
+                            doc.metadata["team_id"] = team_id
+                        documents.extend(loaded_documents)
+                except Exception as e:
+                    print(f"Error processing file {file.get('name')}: {e}")
+                    continue
 
     print(f"Retrieved {len(documents)} documents for teams {team_ids} from Frappe Drive.")
     

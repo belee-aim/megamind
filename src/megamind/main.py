@@ -42,12 +42,13 @@ async def chat(
         }
 
         async def stream_response():
-            
-            async for chunk in graph.astream(inputs):
-                if "generate" in chunk:
-                    last_message = chunk["generate"]["messages"][-1]
-                    if isinstance(last_message, AIMessage):
-                        yield f"data: {last_message.content}\n\n"
+            async for chunk, _ in graph.astream(inputs, stream_mode="messages"):
+                if isinstance(chunk, AIMessage) and chunk.content:
+                    event_str = "event: stream_event\n"
+                    for line in str(chunk.content).splitlines():
+                        data_str = f"data: {line}\n"
+                        yield (event_str + data_str).encode('utf-8')
+                    yield "\n"
 
         return StreamingResponse(stream_response(), media_type="text/event-stream")
 
