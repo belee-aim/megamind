@@ -73,3 +73,36 @@ graph TD
     G --> I;
     I --> J{generate_node};
     J --> K[End];
+```
+
+## Database Migrations
+
+This project uses **Alembic** and **SQLAlchemy** to manage the database schema in a structured and version-controlled way. This allows for easy updates and rollbacks of the database schema as the application evolves.
+
+### Generating a New Migration
+
+When you make changes to the SQLAlchemy models in `src/megamind/models/database.py` (e.g., adding a new table or modifying a column), you need to generate a new migration script. To do this, run the following command from the root of the project:
+
+```bash
+cd src/megamind && alembic revision --autogenerate -m "A descriptive message about the changes"
+```
+
+This will create a new file in `src/megamind/alembic/versions/` that contains the necessary code to apply your changes to the database.
+
+### Applying Migrations
+
+To apply all pending migrations and bring the database schema up to the latest version, run the following command:
+
+```bash
+cd src/megamind && alembic upgrade head
+```
+
+### Downgrading a Migration
+
+To revert the last applied migration, you can use the following command:
+
+```bash
+cd src/megamind && alembic downgrade -1
+```
+
+This will roll back the database schema to the previous version.
