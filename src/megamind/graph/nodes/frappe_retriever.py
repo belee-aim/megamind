@@ -10,18 +10,20 @@ def frappe_retriever_node(state: AgentState):
     user_id = state["user_id"]
     
     frappe_client = FrappeClient()
-    files = frappe_client.get_files()
+    teams = frappe_client.get_teams()
     
     documents = []
-    for file in files:
-        content = frappe_client.get_file_content(file.get("file_url"))
-        if content:
-            documents.append(
-                Document(
-                    page_content=content,
-                    metadata={"source": "frappe", "file_name": file.get("file_name")}
+    for team in teams.values():
+        files = frappe_client.get_files(team=team.get("name"))
+        for file in files:
+            content = frappe_client.get_file_content(file.get("name"))
+            if content:
+                documents.append(
+                    Document(
+                        page_content=content,
+                        metadata={"source": "frappe", "file_name": file.get("file_name")}
+                    )
                 )
-            )
 
     print(f"Retrieved {len(documents)} documents for user {user_id} from Frappe Drive.")
     
