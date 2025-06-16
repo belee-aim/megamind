@@ -1,5 +1,7 @@
 from langgraph.graph import StateGraph, END
 
+from megamind.configuration import Configuration
+
 from .states import AgentState
 from .nodes.generate import generate_node
 from .nodes.check_cache import check_cache_node, should_retrieve_from_frappe
@@ -10,7 +12,7 @@ def build_graph():
     """
     Builds and compiles the LangGraph for the agent.
     """
-    workflow = StateGraph(AgentState)
+    workflow = StateGraph(AgentState, config_schema=Configuration)
 
     # Add nodes
     workflow.add_node("check_cache", check_cache_node)

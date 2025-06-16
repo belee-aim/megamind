@@ -1,16 +1,19 @@
+from langchain_core.runnables import RunnableConfig
 from langchain_community.vectorstores.supabase import SupabaseVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from megamind.clients.supa_client import get_supabase_client
+from megamind.configuration import Configuration
 from ..states import AgentState
 from ...clients.frappe_client import FrappeClient
 
 
-def check_cache_node(state: AgentState):
+def check_cache_node(state: AgentState, config: RunnableConfig):
     """
     Checks if the user's documents are already cached.
     """
     print("---CHECKING CACHE---")
+    configurable = Configuration.from_runnable_config(config)
     question = state["question"]
 
     frappe_client = FrappeClient()
@@ -19,7 +22,7 @@ def check_cache_node(state: AgentState):
     state["team_ids"] = team_ids
 
     client = get_supabase_client()
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = GoogleGenerativeAIEmbeddings(model=configurable.embedding_model)
 
     vector_store = SupabaseVectorStore(
         client=client,

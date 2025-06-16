@@ -1,15 +1,19 @@
 from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 
+from megamind.configuration import Configuration
+
 from ..states import AgentState
 
-def generate_node(state: AgentState):
+def generate_node(state: AgentState, config: RunnableConfig):
     """
     Generates a response using the Google Generative AI LLM based on the retrieved documents and conversation history.
     """
     print("---GENERATE NODE---")
+    configurable = Configuration.from_runnable_config(config)
     question = state["question"]
 
     # Placeholder for retriever
@@ -27,7 +31,7 @@ def generate_node(state: AgentState):
     document_context = "\n".join([doc.page_content for doc in documents])
 
     # Create the LLM instance (replace with actual API key handling)
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-preview-05-20") 
+    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model) 
 
     # Create the chain and invoke it
     chain = prompt | llm

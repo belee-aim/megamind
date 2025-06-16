@@ -124,3 +124,6 @@ docs/
 
 # Image of the graph
 images/
+
+# LangGraph API
+.langgraph_api/
