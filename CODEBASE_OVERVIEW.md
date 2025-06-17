@@ -23,10 +23,10 @@ This file is responsible for constructing the `langgraph` state machine.
 -   **`build_graph()`**: This function defines the structure of the graph, including its nodes and edges.
     -   **Nodes**: The graph consists of four main nodes:
         -   `check_cache`: The entry point of the graph, which checks if a response is available in the cache.
-        -   `retrieve_from_frappe`: A node that retrieves data from the Frappe API.
-        -   `process_and_embed`: A node that processes and embeds the retrieved data.
-        -   `generate`: A node that generates the final response.
-    -   **Edges**: The function defines the conditional edges that control the flow between the nodes based on the output of the `check_cache` node.
+        -   `frappe_retriever_tool`: A `ToolNode` that makes the `frappe_retriever` tool available to the graph. This allows the AI model to dynamically decide whether to call the Frappe API to retrieve additional information.
+        -   `process_and_embed`: A node that processes and embeds the data retrieved by the `frappe_retriever_tool`.
+        -   `generate`: A node that generates the final response. This node can also decide to call the `frappe_retriever_tool` if more information is needed.
+    -   **Edges**: The function defines a cyclical flow where the `generate` node can call the `frappe_retriever_tool`, which then sends its output to the `process_and_embed` node, and finally back to the `generate` node. This loop allows the AI to gather information iteratively until it has enough context to generate a complete response.
 
 ### `src/megamind/graph/states.py`
 
@@ -39,9 +39,14 @@ This file defines the state object for the agent.
 This directory contains the functions that define the logic for each node in the graph.
 
 -   **`check_cache.py`**: The `check_cache_node` function retrieves all teams for the user, checks if a similar question has been answered before for each team, and is available in the cache.
--   **`frappe_retriever.py`**: The `frappe_retriever_node` function retrieves data from the Frappe API for all teams. It uses the `DoclingLoader` to handle different file types.
 -   **`embedder.py`**: The `embedder_node` function processes the data retrieved from Frappe, cleans the content, and creates embeddings for it.
--   **`generate.py`**: The `generate_node` function is responsible for generating the final response. It takes the retrieved documents and the conversation history as input and uses a language model to generate a coherent and contextually relevant answer.
+-   **`generate.py`**: The `generate_node` function is responsible for generating the final response. It takes the retrieved documents and the conversation history as input and uses a language model to generate a coherent and contextually relevant answer. This node can also decide to call the `frappe_retriever_tool` if more information is needed.
+
+### `src/megamind/graph/tools/`
+
+This directory contains tools that can be called by the agent during the graph's execution.
+
+-   **`frappe_retriever.py`**: This file defines the `frappe_retriever` tool, which is responsible for retrieving data from the Frappe API. By defining it as a tool, the AI model can decide to call it dynamically when it needs to fetch additional information to answer a user's query.
 
 ### `src/megamind/clients/frappe_client.py`
 
@@ -63,16 +68,16 @@ This file manages the application's configuration, including loading environment
 ```mermaid
 graph TD
     A[User Request: /api/v1/chat] --> B{src/megamind/main.py};
-    B --> C{src/megamind/graph/builder.py: build_graph};
-    C --> D[StateGraph];
-    D -- Entry Point --> E{check_cache_node};
-    E -- Should Retrieve from Frappe? --> F{Yes};
-    E -- Should Process and Embed? --> G{No};
-    F --> H{retrieve_from_frappe_node};
-    H --> I{process_and_embed_node};
-    G --> I;
-    I --> J{generate_node};
-    J --> K[End];
+    B --> C{build_graph};
+    C -- Entry Point --> D[check_cache_node];
+    D --> E{generate_node};
+    subgraph "Tool Calling Loop"
+        E -- Call Tool? --> F[Yes];
+        F --> G{frappe_retriever_tool};
+        G --> H{process_and_embed_node};
+        H --> E;
+    end
+    E -- Finish --> I[End];
 ```
 
 ## Database Migrations
