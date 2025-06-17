@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="AI Park",
+    title="Megamindesu",
     description="A FastAPI microservice to interact with AI models",
     version="0.1.0"
 )
@@ -23,10 +23,10 @@ app = FastAPI(
 @app.get("/")
 async def read_root():
     logger.info("Root endpoint accessed")
-    return {"message": "Welcome to the Park"}
+    return {"message": "Welcome to the Megamindesu API"}
 
-@app.post("/api/v1/chat") 
-async def chat(
+@app.post("/api/v1/stream") 
+async def stream(
     request_data: ChatRequest
 ):
     """
