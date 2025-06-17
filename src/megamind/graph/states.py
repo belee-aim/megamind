@@ -8,6 +8,4 @@ class AgentState(TypedDict):
 
     messages: Annotated[List[AnyMessage], add_messages]
     team_ids: List[str]
-    question: str
     documents: List[Document]
-    vector_store: Any

@@ -1,10 +1,13 @@
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 
+from megamind import prompts
 from megamind.configuration import Configuration
+from megamind.graph.tools import frappe_retriever
+from megamind.utils import get_human_message
 
 from ..states import AgentState
 
@@ -14,30 +17,25 @@ def generate_node(state: AgentState, config: RunnableConfig):
     """
     print("---GENERATE NODE---")
     configurable = Configuration.from_runnable_config(config)
-    question = state["question"]
+    human_message = get_human_message(state)   
 
-    # Placeholder for retriever
-    # In a real implementation, you would use the vector_store to retrieve relevant documents
-    # For now, we'll just use the documents from the state
+    if not human_message:
+        raise ValueError("No human message found in the state.")
+    
     documents = state.get("documents", [])
     
     # Create a prompt template
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful AI assistant. Only use the following documents to answer the user's question:\n\n{documents}"),
-        ("human", "{question}")
+        ("system", prompts.generate_node_instructions),
+        ("human", "{question}"),
     ])
 
-    # Format the documents for the prompt
     document_context = "\n".join([doc.page_content for doc in documents])
 
-    # Create the LLM instance (replace with actual API key handling)
     llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model) 
-
-    # Create the chain and invoke it
+    llm.bind_tools([frappe_retriever])
     chain = prompt | llm
 
-    # Invoke the chain to get the complete response
-    response = chain.invoke({"documents": document_context, "question": question})
+    response = chain.invoke({"documents": document_context, "question": human_message.content})
 
-    # Return a dictionary to update the state with the final response
-    return {"messages": [AIMessage(content=response.content)]}
+    return {"messages": [response]}

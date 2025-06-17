@@ -1,15 +1,17 @@
+from langchain_core.runnables import RunnableConfig
 from langchain_community.vectorstores.supabase import SupabaseVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from megamind.clients.supa_client import get_supabase_client
+from megamind.configuration import Configuration
 from ..states import AgentState
 
-def embedder_node(state: AgentState):
+def embedder_node(state: AgentState, config: RunnableConfig):
     """
     Processes documents, embeds them, and stores them in a vector store.
     """
-    print("---PROCESSING AND EMBEDDING DOCUMENTS---")
+    configurable = Configuration.from_runnable_config(config)
     documents = state["documents"]
     
     # Clean documents
@@ -23,7 +25,7 @@ def embedder_node(state: AgentState):
     print(f"---CHUNCKED {len(documents)} into {len(chunked_documents)} documents---")
 
     # Embed and store documents
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = GoogleGenerativeAIEmbeddings(model=configurable.embedding_model)
     supabase_client = get_supabase_client()
     
     vector_store = SupabaseVectorStore.from_documents(
@@ -34,5 +36,4 @@ def embedder_node(state: AgentState):
         query_name="match_documents",
     )
     
-    print("---DOCUMENTS EMBEDDED AND STORED---")
     return {"vector_store": vector_store}

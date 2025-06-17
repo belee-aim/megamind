@@ -38,7 +38,6 @@ async def chat(
         # Invoke the graph to get the final state
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
-            "question": request_data.question,
         }
 
         async def stream_response():
