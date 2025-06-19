@@ -127,3 +127,6 @@ images/
 
 # LangGraph API
 .langgraph_api/
+
+# Supabase
+supabase/.temp/

@@ -82,32 +82,60 @@ graph TD
 
 ## Database Migrations
 
-This project uses **Alembic** and **SQLAlchemy** to manage the database schema in a structured and version-controlled way. This allows for easy updates and rollbacks of the database schema as the application evolves.
+This project uses the **Supabase CLI** to manage database schema migrations. This approach ensures that database changes are version-controlled and can be applied consistently across different environments.
 
-### Generating a New Migration
+### Installing the Supabase CLI
 
-When you make changes to the SQLAlchemy models in `src/megamind/models/database.py` (e.g., adding a new table or modifying a column), you need to generate a new migration script. To do this, run the following command from the root of the project:
+To get started, you need to install the Supabase CLI. Follow the instructions for your operating system:
+
+-   **macOS**:
+    ```bash
+    brew install supabase/tap/supabase
+    ```
+
+-   **Windows**:
+    ```bash
+    scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+    scoop install supabase
+    ```
+
+-   **Linux**:
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y supabase
+    ```
+
+-   **npm**:
+    ```bash
+    npm install -g supabase
+    ```
+
+For more details, refer to the [official Supabase documentation](https://supabase.com/docs/guides/cli/getting-started).
+
+### Linking the Project
+
+Before you can manage migrations, you need to link your local repository to your Supabase project. Run the following command and follow the prompts:
 
 ```bash
-cd src/megamind && alembic revision --autogenerate -m "A descriptive message about the changes"
+supabase link --project-ref <your-project-id>
 ```
 
-This will create a new file in `src/megamind/alembic/versions/` that contains the necessary code to apply your changes to the database.
+### Creating a New Migration
+
+To create a new migration file after making changes to your local database schema, use the following command:
+
+```bash
+supabase db diff -f <migration_name>
+```
+
+This command will generate a new SQL file in the `supabase/migrations` directory that captures the recent changes.
 
 ### Applying Migrations
 
-To apply all pending migrations and bring the database schema up to the latest version, run the following command:
+To apply all pending migrations to your local database, run:
 
 ```bash
-cd src/megamind && alembic upgrade head
+supabase db push
 ```
 
-### Downgrading a Migration
-
-To revert the last applied migration, you can use the following command:
-
-```bash
-cd src/megamind && alembic downgrade -1
-```
-
-This will roll back the database schema to the previous version.
+To apply migrations to your remote Supabase database, you will need to commit the migration files to your Git repository and push them. The Supabase GitHub integration will automatically apply the migrations.
