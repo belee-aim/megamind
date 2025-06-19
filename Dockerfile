@@ -1,28 +1,48 @@
-FROM python:3.10-slim
+# Use a specific version of Python for reproducibility
+FROM python:3.11-slim as builder
 
+# Set the working directory
 WORKDIR /usr/src/app
 
-# Install system dependencies that might be needed by some Python packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Install poetry
+RUN pip install --no-cache-dir poetry
 
-# Copy the requirements file into the container at /usr/src/app
-COPY requirements.txt ./
+# Configure poetry to not create a virtual environment
+RUN poetry config virtualenvs.create false
 
-# Install any needed packages specified in requirements.txt
-# Using --no-cache-dir to reduce image size
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy only the dependency files to leverage Docker cache
+COPY pyproject.toml poetry.lock README.md ./
 
-# Copy the rest of the application code into the container at /usr/src/app
-COPY ./app ./app
+# Install dependencies, caching the results
+RUN --mount=type=cache,target=/root/.cache/pypoetry poetry install --no-interaction --no-ansi --no-root
 
-# Make port 8000 available to the world outside this container
+# Copy the rest of the application code
+COPY ./src .
+
+# Final stage
+FROM python:3.11-slim
+
+# Create a non-root user
+RUN addgroup --system app && adduser --system --group app
+
+# Set the working directory
+WORKDIR /home/app
+
+# Copy installed packages and executables from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy the application code from the builder stage
+COPY --from=builder /usr/src/app /home/app
+
+# Set ownership for the app user
+RUN chown -R app:app /home/app
+
+# Switch to the non-root user
+USER app
+
+# Expose the port the app runs on
 EXPOSE 8000
 
-# Define environment variable for the port (optional, Uvicorn default is 8000)
-ENV PORT 8000
-
-# Run app.main:app when the container launches
-# Use 0.0.0.0 to make it accessible from outside the container
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application
+CMD ["uvicorn", "megamind.main:app", "--host", "0.0.0.0", "--port", "8000"]

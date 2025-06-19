@@ -12,7 +12,7 @@ The application is designed to be modular, with clear separation of concerns bet
 
 This file serves as the entry point for the application. It initializes the FastAPI application and defines the API endpoints.
 
--   **`@app.post("/api/v1/chat")`**: This is the primary endpoint for interacting with the AI. It receives a `ChatRequest` object containing the user's prompt. The endpoint is responsible for:
+-   **`@app.post("/api/v1/stream")`**: This is the primary endpoint for interacting with the AI. It receives a `ChatRequest` object containing the user's prompt. The endpoint is responsible for:
     1.  Invoking the graph with the user's message.
     2.  Streaming the response back to the client using `StreamingResponse`.
 
@@ -139,3 +139,29 @@ supabase db push
 ```
 
 To apply migrations to your remote Supabase database, you will need to commit the migration files to your Git repository and push them. The Supabase GitHub integration will automatically apply the migrations.
+
+## Running the Application with Docker
+
+To run the application in a Docker container, you first need to build the Docker image. Make sure you have Docker installed and running on your system.
+
+### Building the Docker Image
+
+To take advantage of Docker's build cache and significantly speed up the build process, especially the dependency installation step, use the following `docker buildx` command:
+
+```bash
+docker buildx build --mount=type=cache,target=/root/.cache/pypoetry -t megamind .
+```
+
+This command uses a cache mount to store Poetry's downloaded packages between builds, which means that dependencies will not be re-downloaded unless they have changed.
+
+### Running the Docker Container
+
+Once the image is built, you can run it as a container. The application requires environment variables to be set, which can be passed to the container using an `.env` file.
+
+Create a `.env` file in the root of the project with the necessary environment variables. Then, run the following command to start the container:
+
+```bash
+docker run --env-file .env -p 8000:8000 megamind
+```
+
+This command starts the container, maps port 8000 of the container to port 8000 on your local machine, and loads the environment variables from the `.env` file.
