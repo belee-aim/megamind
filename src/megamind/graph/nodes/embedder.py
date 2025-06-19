@@ -2,6 +2,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_community.vectorstores.supabase import SupabaseVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from loguru import logger
 
 from megamind.clients.supa_client import get_supabase_client
 from megamind.configuration import Configuration
@@ -21,8 +22,10 @@ def embedder_node(state: AgentState, config: RunnableConfig):
     # Chunk documents
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunked_documents = text_splitter.split_documents(documents)
-    
-    print(f"---CHUNCKED {len(documents)} into {len(chunked_documents)} documents---")
+
+    logger.info(
+        f"---CHUNCKED {len(documents)} into {len(chunked_documents)} documents---"
+    )
 
     # Embed and store documents
     embeddings = GoogleGenerativeAIEmbeddings(model=configurable.embedding_model)

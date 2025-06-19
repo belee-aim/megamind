@@ -1,4 +1,5 @@
 import requests
+from loguru import logger
 from ..utils.config import settings
 
 class FrappeClient:
@@ -15,7 +16,7 @@ class FrappeClient:
         Retrieves a list of teams from Frappe Drive.
         """
         if not all([self.frappe_url, self.api_key, self.api_secret]):
-            print("Frappe credentials not set. Skipping team retrieval.")
+            logger.warning("Frappe credentials not set. Skipping team retrieval.")
             return {}
 
         try:
@@ -27,7 +28,7 @@ class FrappeClient:
             response.raise_for_status()
             return response.json().get("message", {})
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching teams from Frappe: {e}")
+            logger.error(f"Error fetching teams from Frappe: {e}")
             return {}
 
     def get_files(self, team, entity_name=None):
@@ -35,7 +36,7 @@ class FrappeClient:
         Retrieves a list of files from Frappe Drive.
         """
         if not all([self.frappe_url, self.api_key, self.api_secret]):
-            print("Frappe credentials not set. Skipping file retrieval.")
+            logger.warning("Frappe credentials not set. Skipping file retrieval.")
             return []
 
         all_files = []
@@ -60,7 +61,7 @@ class FrappeClient:
 
             return all_files
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching files from Frappe: {e}")
+            logger.error(f"Error fetching files from Frappe: {e}")
             return []
 
     def get_file_content(self, file_name):
@@ -80,5 +81,5 @@ class FrappeClient:
             file_response.raise_for_status()
             return file_response.content
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching file content: {e}")
+            logger.error(f"Error fetching file content: {e}")
             return None

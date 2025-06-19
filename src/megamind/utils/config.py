@@ -11,8 +11,9 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str
     supabase_connection_string: str
+    log_level: str = "INFO"
+    json_logs: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings() # type: ignore
-

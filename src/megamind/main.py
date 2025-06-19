@@ -1,23 +1,19 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage # Added AIMessage
-from pydantic import BaseModel
+from langchain_core.messages import AIMessage, HumanMessage
+from loguru import logger
 
-from .graph import graph
+from megamind.graph import graph
+from megamind.models.requests import ChatRequest
+from megamind.utils.logger import setup_logging
 
+setup_logging()
 
-import logging
-
-class ChatRequest(BaseModel):
-    question: str
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Megamindesu",
     description="A FastAPI microservice to interact with AI models",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 @app.get("/")
@@ -55,5 +51,7 @@ async def stream(
     except HTTPException as e:
         raise e
     except Exception as e:
-        print(f"Unexpected error in chat endpoint: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+        logger.error(f"Unexpected error in chat endpoint: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
+        )

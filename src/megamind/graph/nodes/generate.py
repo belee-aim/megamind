@@ -1,8 +1,7 @@
-from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.documents import Document
+from loguru import logger
 
 from megamind import prompts
 from megamind.configuration import Configuration
@@ -15,9 +14,9 @@ def generate_node(state: AgentState, config: RunnableConfig):
     """
     Generates a response using the Google Generative AI LLM based on the retrieved documents and conversation history.
     """
-    print("---GENERATE NODE---")
+    logger.info("---GENERATE NODE---")
     configurable = Configuration.from_runnable_config(config)
-    human_message = get_human_message(state)   
+    human_message = get_human_message(state)
 
     if not human_message:
         raise ValueError("No human message found in the state.")

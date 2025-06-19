@@ -1,5 +1,6 @@
 import tempfile
 
+from loguru import logger
 from pydantic import BaseModel, Field
 from megamind.clients.frappe_client import FrappeClient
 from langchain_core.tools import tool, ToolException
@@ -58,7 +59,7 @@ def frappe_retriever(team_ids):
                                 doc.metadata["team_id"] = team_id
                             documents.extend(loaded_documents)
                     except Exception as e:
-                        print(f"Error processing file {file.get('name')}: {e}")
+                        logger.error(f"Error processing file {file.get('name')}: {e}")
                         continue
     except Exception as e:
         raise ToolException(f"Failed to retrieve documents from Frappe Drive: {e}")

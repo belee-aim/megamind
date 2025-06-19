@@ -56,18 +56,21 @@ This file contains the client for interacting with the Frappe API. It handles th
 
 This directory contains the data models for the application.
 
--   **`requests.py`**: Defines the `ChatRequest` model for the data received by the `/api/v1/chat` endpoint.
--   **`responses.py`**: Defines the `ChatResponse` model for the data sent back to the client.
+-   **`requests.py`**: Defines the `ChatRequest` model for the data received by the `/api/v1/stream` endpoint.
 
 ### `src/megamind/utils/config.py`
 
 This file manages the application's configuration, including loading environment variables and making them available to the rest of the application.
 
+### `src/megamind/utils/logger.py`
+
+This file sets up a centralized logging system for the application using `loguru`. It ensures that all logs are structured and consistent, with support for JSON formatting.
+
 ## Visual Representation
 
 ```mermaid
 graph TD
-    A[User Request: /api/v1/chat] --> B{src/megamind/main.py};
+    A[User Request: /api/v1/stream] --> B{src/megamind/main.py};
     B --> C{build_graph};
     C -- Entry Point --> D[check_cache_node];
     D --> E{generate_node};

@@ -1,7 +1,7 @@
-from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_community.vectorstores.supabase import SupabaseVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from loguru import logger
 
 from megamind.clients.supa_client import get_supabase_client
 from megamind.configuration import Configuration
@@ -44,7 +44,7 @@ def check_cache_node(state: AgentState, config: RunnableConfig):
         all_documents.extend(documents)
 
     if not all_documents:
-        print(f"No cache found for teams {team_ids}.")
+        logger.info(f"No cache found for teams {team_ids}.")
         return {"documents": [], "team_ids": team_ids}
 
     return {"documents": all_documents, "team_ids": team_ids}
