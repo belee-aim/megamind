@@ -1,12 +1,11 @@
+from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
 from loguru import logger
 
 from megamind import prompts
 from megamind.configuration import Configuration
 from megamind.graph.tools import frappe_retriever
-from megamind.utils import get_human_message
 
 from ..states import AgentState
 
@@ -16,25 +15,13 @@ def generate_node(state: AgentState, config: RunnableConfig):
     """
     logger.info("---GENERATE NODE---")
     configurable = Configuration.from_runnable_config(config)
-    human_message = get_human_message(state)
 
-    if not human_message:
-        raise ValueError("No human message found in the state.")
-    
     documents = state.get("documents", [])
-    
-    # Create a prompt template
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", prompts.generate_node_instructions),
-        ("human", "{question}"),
-    ])
-
     document_context = "\n".join([doc.page_content for doc in documents])
+    system_prompt = prompts.generate_node_instructions.format(documents=document_context, team_ids=state.get("team_ids", []))
+    messages = [SystemMessage(content=system_prompt)] + state.get("messages", [])
 
     llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model) 
-    llm.bind_tools([frappe_retriever])
-    chain = prompt | llm
-
-    response = chain.invoke({"documents": document_context, "question": human_message.content})
+    response = llm.bind_tools([frappe_retriever]).invoke(messages)
 
     return {"messages": [response]}

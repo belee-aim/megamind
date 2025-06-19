@@ -14,6 +14,7 @@ def check_cache_node(state: AgentState, config: RunnableConfig):
     """
     Checks if the user's documents are already cached.
     """
+    logger.debug("---CHECK CACHE NODE---")
     configurable = Configuration.from_runnable_config(config)
 
     human_message = get_human_message(state)   
@@ -44,7 +45,7 @@ def check_cache_node(state: AgentState, config: RunnableConfig):
         all_documents.extend(documents)
 
     if not all_documents:
-        logger.info(f"No cache found for teams {team_ids}.")
+        logger.warning(f"No cache found for teams {team_ids}.")
         return {"documents": [], "team_ids": team_ids}
 
     return {"documents": all_documents, "team_ids": team_ids}

@@ -1,10 +1,13 @@
 import tempfile
+from typing import Annotated
 
 from loguru import logger
 from pydantic import BaseModel, Field
 from megamind.clients.frappe_client import FrappeClient
-from langchain_core.tools import tool, ToolException
+from langchain_core.tools import tool, ToolException, InjectedToolCallId
+from langchain_core.messages import ToolMessage
 from langchain_docling.loader import DoclingLoader
+from langgraph.types import Command
 
 SUPPORTED_MIMETYPES = [
     "application/pdf",
@@ -24,12 +27,14 @@ SUPPORTED_MIMETYPES = [
 
 class FrappeRetrieverSchema(BaseModel):
     """
-    Retrieves documents from Frappe Drive.
+    Retrieves team documents from Frappe Drive.
     """
+    tool_call_id: Annotated[str, InjectedToolCallId]
     team_ids: list[str] = Field(description="List of team IDs to retrieve documents from Frappe Drive.")
 
-@tool(args_schema=FrappeRetrieverSchema, return_direct=True)
-def frappe_retriever(team_ids):
+@tool(args_schema=FrappeRetrieverSchema)
+def frappe_retriever(tool_call_id, team_ids):
+    logger.debug("---FRAPPE RETRIEVER TOOL---")
     
     try:
         frappe_client = FrappeClient()
@@ -54,7 +59,7 @@ def frappe_retriever(team_ids):
                             loader = DoclingLoader(temp_file_path)
                             loaded_documents = loader.load()
                             for doc in loaded_documents:
-                                doc.metadata["source"] = "frappe"
+                                doc.metadata["source"] = "frappe/drive"
                                 doc.metadata["file_name"] = file.get("name")
                                 doc.metadata["team_id"] = team_id
                             documents.extend(loaded_documents)
@@ -64,4 +69,4 @@ def frappe_retriever(team_ids):
     except Exception as e:
         raise ToolException(f"Failed to retrieve documents from Frappe Drive: {e}")
 
-    return {"documents": documents}
+    return Command(update={"documents": documents, "messages": [ToolMessage("Retrieved documents from Frappe Drive.", tool_call_id=tool_call_id)]})
