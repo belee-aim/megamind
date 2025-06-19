@@ -13,7 +13,7 @@ def generate_node(state: AgentState, config: RunnableConfig):
     """
     Generates a response using the Google Generative AI LLM based on the retrieved documents and conversation history.
     """
-    logger.info("---GENERATE NODE---")
+    logger.debug("---GENERATE NODE---")
     configurable = Configuration.from_runnable_config(config)
 
     documents = state.get("documents", [])
