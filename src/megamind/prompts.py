@@ -4,3 +4,9 @@ Tools available to you:\n
 - `frappe_retriever`: Use this tool to retrieve relevant documents from the Frappe database
 User's team IDs: {team_ids}\n
 Only use the following documents to answer the user's question:\n\n{documents}"""
+
+grader_instructions = """You are a grader assessing relevance of a retrieved document to a user question. \n
+    "Here is the retrieved document: \n\n {context} \n\n
+    "Here is the user question: {question} \n
+    "If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n
+    "Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question."""

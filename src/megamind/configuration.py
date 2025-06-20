@@ -18,9 +18,9 @@ class Configuration(BaseModel):
         description="The name of the language model to use for the agent's query generation.",
     )
 
-    number_of_initial_queries: int = Field(
-        default=3,
-        description="The number of initial search queries to generate."
+    grader_model: str = Field(
+        default="gemini-2.5-flash-preview-05-20",
+        description="The name of the language model to use for grading document relevancy."
     )
 
     max_research_loops: int = Field(

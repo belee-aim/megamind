@@ -9,11 +9,11 @@ from megamind.graph.tools import frappe_retriever
 
 from ..states import AgentState
 
-def generate_node(state: AgentState, config: RunnableConfig):
+def agent_node(state: AgentState, config: RunnableConfig):
     """
     Generates a response using the Google Generative AI LLM based on the retrieved documents and conversation history.
     """
-    logger.debug("---GENERATE NODE---")
+    logger.debug("---AGENT NODE---")
     configurable = Configuration.from_runnable_config(config)
 
     documents = state.get("documents", [])
