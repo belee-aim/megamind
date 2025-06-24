@@ -8,6 +8,8 @@ from langchain_core.tools import tool, ToolException, InjectedToolCallId
 from langchain_core.messages import ToolMessage
 from langchain_docling.loader import DoclingLoader
 from langgraph.types import Command
+from langgraph.prebuilt import InjectedState
+from megamind.graph.states import AgentState
 
 SUPPORTED_MIMETYPES = [
     "application/pdf",
@@ -29,15 +31,17 @@ class FrappeRetrieverSchema(BaseModel):
     """
     Retrieves team documents from Frappe Drive.
     """
+    state: Annotated[AgentState, InjectedState]
     tool_call_id: Annotated[str, InjectedToolCallId]
     team_ids: list[str] = Field(description="List of team IDs to retrieve documents from Frappe Drive.")
 
 @tool(args_schema=FrappeRetrieverSchema)
-def frappe_retriever(tool_call_id, team_ids):
+def frappe_retriever(state, tool_call_id, team_ids):
     logger.debug("---FRAPPE RETRIEVER TOOL---")
     
     try:
-        frappe_client = FrappeClient()
+        cookie = state.get("cookie")
+        frappe_client = FrappeClient(cookie=cookie)
         
         documents = []
         for team_id in team_ids:

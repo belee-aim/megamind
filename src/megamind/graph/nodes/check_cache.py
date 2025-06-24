@@ -22,7 +22,8 @@ def check_cache_node(state: AgentState, config: RunnableConfig):
     if not human_message:
         raise ValueError("No human message found in the state.")
 
-    frappe_client = FrappeClient()
+    cookie = state.get("cookie")
+    frappe_client = FrappeClient(cookie=cookie)
     teams = frappe_client.get_teams()
     team_ids = [team.get("name") for team in teams.values()]
     state["team_ids"] = team_ids

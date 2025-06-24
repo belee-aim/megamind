@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from loguru import logger
@@ -21,8 +21,9 @@ async def read_root():
     logger.info("Root endpoint accessed")
     return {"message": "Welcome to the Megamindesu API"}
 
-@app.post("/api/v1/stream") 
+@app.post("/api/v1/stream")
 async def stream(
+    request: Request,
     request_data: ChatRequest
 ):
     """
@@ -31,9 +32,13 @@ async def stream(
     """
     
     try:
+        # Extract the cookie from the request
+        cookie = request.headers.get("cookie")
+
         # Invoke the graph to get the final state
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
+            "cookie": cookie,
         }
 
         async def stream_response():

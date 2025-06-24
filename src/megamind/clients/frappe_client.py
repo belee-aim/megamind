@@ -3,13 +3,13 @@ from loguru import logger
 from ..utils.config import settings
 
 class FrappeClient:
-    def __init__(self):
+    def __init__(self, cookie: str | None = None):
         self.frappe_url = settings.frappe_url
         self.api_key = settings.frappe_api_key
         self.api_secret = settings.frappe_api_secret
-        self.headers = {
-            "Authorization": f"token {self.api_key}:{self.api_secret}"
-        }
+        self.headers = dict()
+        if cookie:
+            self.headers["Cookie"] = cookie
 
     def get_teams(self):
         """

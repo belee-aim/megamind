@@ -7,3 +7,4 @@ class AgentState(TypedDict):
     messages: Annotated[List[AnyMessage], add_messages]
     team_ids: List[str]
     documents: List[Document]
+    cookie: str | None
