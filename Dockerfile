@@ -4,6 +4,9 @@ FROM python:3.11-slim as builder
 # Set the working directory
 WORKDIR /usr/src/app
 
+# Create a temporary directory for pip to use
+RUN mkdir /tmp
+
 # Install pip-tools
 RUN pip install --no-cache-dir pip-tools
 
