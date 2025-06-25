@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  web:
+    # Build from the Dockerfile in the current directory
+    build: .
+    # Name the resulting image
+    image: megamind
+    # The command to run the app. This should match the CMD in your Dockerfile.
+    # It can be omitted here if the Dockerfile's CMD is sufficient.
+    command: uvicorn megamind.main:app --host 0.0.0.0 --port 8000
+    # Expose the port to the internal Docker network for Nginx to connect to.
+    # This does not publish the port to the host machine.
+    expose:
+      - 8000
+
+  nginx:
+    # Use the latest stable nginx image
+    image: nginx:latest
+    # Map the host's port 80 to the container's port 80
+    ports:
+      - "80:80"
+    # Mount the nginx configuration file
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    # Ensure the 'web' service is started before the 'nginx' service
+    depends_on:
+      - web
