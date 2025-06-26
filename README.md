@@ -13,7 +13,7 @@ poetry install
 Run the server in dev mode
 
 ```bash
-fastapi dev src/megamind
+fastapi dev src/megamind/main.py
 ```
 
 To generate image of the graph  
