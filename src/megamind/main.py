@@ -1,20 +1,34 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from loguru import logger
 
-from megamind.graph import graph
+from megamind.clients.manager import client_manager
+from megamind.graph import build_graph
 from megamind.models.requests import ChatRequest
 from megamind.utils.logger import setup_logging
 
 setup_logging()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # build the graph
+    client_manager.initialize_client()
+    graph = await build_graph()
+    app.state.graph = graph
+    yield
+
+
 app = FastAPI(
     title="Megamindesu",
     description="A FastAPI microservice to interact with AI models",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
 
 @app.get("/")
 async def read_root():
@@ -42,6 +56,7 @@ async def stream(
         }
 
         async def stream_response():
+            graph = request.app.state.graph
             async for chunk, _ in graph.astream(inputs, stream_mode="messages"):
                 if isinstance(chunk, AIMessage) and chunk.content:
                     event_str = "event: stream_event\n"

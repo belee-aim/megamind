@@ -11,7 +11,7 @@ from megamind.configuration import Configuration
 from megamind.utils import get_human_message
 from ..states import AgentState
 
-def embedder_node(state: AgentState, config: RunnableConfig):
+def embed_node(state: AgentState, config: RunnableConfig):
     """
     Processes documents, embeds them, and stores them in a vector store.
     """

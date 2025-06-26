@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     supabase_connection_string: str
     log_level: str = "INFO"
     json_logs: bool = False
+    erpnext_mcp_url: str
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
