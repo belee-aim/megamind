@@ -14,15 +14,13 @@ RUN pip install --no-cache-dir pip-tools
 COPY pyproject.toml poetry.lock README.md ./
 
 # Compile requirements.txt from pyproject.toml
-# This resolves dependencies and creates a locked requirements file.
 RUN pip-compile --output-file=requirements.txt pyproject.toml
 
 # Install the compiled requirements
-# This step is fast as it doesn't need to resolve dependencies.
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
-COPY ./src ./src
+# Copy the application source code
+COPY ./src .
 
 # Install the project itself in editable mode
 RUN pip install -e .
@@ -36,15 +34,13 @@ RUN addgroup --system app && adduser --system --group app
 # Set the working directory
 WORKDIR /home/app
 
-# Set the PYTHONPATH to include the app's root directory
-ENV PYTHONPATH=/home/app
-
 # Copy installed packages from the builder stage
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy the application code from the builder stage
-COPY --from=builder /usr/src/app/src /home/app/src
+# ** THE KEY CHANGE IS HERE **
+# Copy the application code directly into the workdir
+COPY --from=builder /usr/src/app/megamind /home/app/megamind
 
 # Set ownership for the app user
 RUN chown -R app:app /home/app
