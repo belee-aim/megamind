@@ -20,7 +20,7 @@ RUN pip-compile --output-file=requirements.txt pyproject.toml
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application source code
-COPY ./src .
+COPY ./src ./src
 
 # Install the project itself in editable mode
 RUN pip install -e .
@@ -38,9 +38,7 @@ WORKDIR /home/app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# ** THE KEY CHANGE IS HERE **
-# Copy the application code directly into the workdir
-COPY --from=builder /usr/src/app/megamind /home/app/megamind
+COPY --from=builder /usr/src/app/ /home/app/
 
 # Set ownership for the app user
 RUN chown -R app:app /home/app
@@ -52,4 +50,4 @@ USER app
 EXPOSE 8000
 
 # Run the application
-CMD ["uvicorn", "megamind.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.megamind.main:app", "--host", "0.0.0.0", "--port", "8000"]
