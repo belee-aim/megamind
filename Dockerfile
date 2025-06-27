@@ -36,6 +36,9 @@ RUN addgroup --system app && adduser --system --group app
 # Set the working directory
 WORKDIR /home/app
 
+# Set the PYTHONPATH to include the app's root directory
+ENV PYTHONPATH=/home/app
+
 # Copy installed packages from the builder stage
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
