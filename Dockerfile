@@ -1,5 +1,5 @@
 # Use a specific version of Python for reproducibility
-FROM python:3.11-slim as builder
+FROM python:3.12-slim as builder
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -20,13 +20,13 @@ RUN pip-compile --output-file=requirements.txt pyproject.toml
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application source code
-COPY ./src ./src
+COPY ./src .
 
 # Install the project itself in editable mode
 RUN pip install -e .
 
 # Final stage
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Create a non-root user
 RUN addgroup --system app && adduser --system --group app
@@ -38,7 +38,7 @@ WORKDIR /home/app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY --from=builder /usr/src/app/ /home/app/
+COPY --from=builder /usr/src/app /home/app
 
 # Set ownership for the app user
 RUN chown -R app:app /home/app
@@ -50,4 +50,4 @@ USER app
 EXPOSE 8000
 
 # Run the application
-CMD ["uvicorn", "src.megamind.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "megamind.main:app", "--host", "0.0.0.0", "--port", "8000"]
