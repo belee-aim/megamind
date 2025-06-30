@@ -1,20 +1,22 @@
 # Megamind of AIMLink
 
+The main dependency manager of this project is uv.
+
+Follow uv's official [website](https://docs.astral.sh/uv/getting-started/installation/) to install it.
+
 To get started create a virtual env and download the dependencies
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install poetry
-poetry install
+uv venv
+uv sync
 ```
 
-Run the server in dev mode
+Then, run the fastapi server in development mode by running below script. 
 
 ```bash
-poetry run fastapi dev src/megamind/main.py
+uv run fastapi dev src/megamind/main.py
 ```
+
 
 To generate image of the graph  
 

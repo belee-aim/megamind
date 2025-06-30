@@ -27,8 +27,8 @@ async def agent_node(state: AgentState, config: RunnableConfig):
     messages = [SystemMessage(content=system_prompt)] + state.get("messages", [])
 
     llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
-    mcp_tools = await mcp_client.get_tools()
-    tools = [frappe_retriever] + mcp_tools
+    # mcp_tools = await mcp_client.get_tools()
+    tools = [frappe_retriever]
     response = await llm.bind_tools(tools).ainvoke(messages)
 
     return {"messages": [response]}

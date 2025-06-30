@@ -55,13 +55,27 @@ async def stream(request: Request, request_data: ChatRequest):
 
         async def stream_response():
             graph = request.app.state.graph
-            async for chunk, _ in graph.astream(inputs, stream_mode="messages"):
-                if isinstance(chunk, AIMessage) and chunk.content:
-                    event_str = "event: stream_event\n"
-                    for line in str(chunk.content).splitlines():
-                        data_str = f"data: {line}\n"
-                        yield (event_str + data_str).encode("utf-8")
-                    yield "\n"
+            try:
+                async for chunk, _ in graph.astream(inputs, stream_mode="messages"):
+                    if isinstance(chunk, AIMessage) and chunk.content:
+                        event_str = "event: stream_event\n"
+                        for line in str(chunk.content).splitlines():
+                            data_str = f"data: {line}\n"
+                            yield (event_str + data_str).encode("utf-8")
+                        yield "\n"
+
+                # Signal the end of the stream to the client
+                yield "event: done\ndata: {}\n\n".encode("utf-8")
+
+            except Exception as e:
+                logger.error(f"Error during SSE stream generation: {e}")
+                # Send an error event to the client before closing
+                import json
+
+                error_data = {"message": "An error occurred during the stream."}
+                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
+                    "utf-8"
+                )
 
         return StreamingResponse(stream_response(), media_type="text/event-stream")
 

@@ -1,0 +1,7 @@
+notebooks/
+dist/
+build/
+images/
+docs/
+supabase/
+.env
