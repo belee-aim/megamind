@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     json_logs: bool = False
     erpnext_mcp_url: str
+    llama_cloud_api_key: str
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
