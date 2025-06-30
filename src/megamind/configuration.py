@@ -20,12 +20,11 @@ class Configuration(BaseModel):
 
     grader_model: str = Field(
         default="gemini-2.5-flash-preview-05-20",
-        description="The name of the language model to use for grading document relevancy."
+        description="The name of the language model to use for grading document relevancy.",
     )
 
     max_research_loops: int = Field(
-        default=2,
-        description="The maximum number of research loops to perform."
+        default=2, description="The maximum number of research loops to perform."
     )
 
     @classmethod

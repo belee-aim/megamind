@@ -27,39 +27,52 @@ SUPPORTED_MIMETYPES = [
     "image/webp",
 ]
 
+
 class FrappeRetrieverSchema(BaseModel):
     """
     Retrieves team documents from Frappe Drive.
     """
+
     state: Annotated[AgentState, InjectedState]
     tool_call_id: Annotated[str, InjectedToolCallId]
-    team_ids: list[str] = Field(description="List of team IDs to retrieve documents from Frappe Drive.")
+    team_ids: list[str] = Field(
+        description="List of team IDs to retrieve documents from Frappe Drive."
+    )
+
 
 @tool(args_schema=FrappeRetrieverSchema)
 def frappe_retriever(state, tool_call_id, team_ids):
     logger.debug("---FRAPPE RETRIEVER TOOL---")
-    
+
     try:
         cookie = state.get("cookie")
         frappe_client = FrappeClient(cookie=cookie)
-        
+
         documents = []
         for team_id in team_ids:
             files = frappe_client.get_files(team=team_id)
             for file in files:
                 if file.get("mime_type") in SUPPORTED_MIMETYPES:
                     file_path = file.get("path", "")
-                    file_extension = f".{file_path.split('.')[-1]}" if "." in file_path else ""
+                    file_extension = (
+                        f".{file_path.split('.')[-1]}" if "." in file_path else ""
+                    )
                     try:
                         raw_content = frappe_client.get_file_content(file.get("name"))
                         if raw_content:
                             file_path = file.get("path", "")
-                            file_extension = f".{file_path.split('.')[-1]}" if "." in file_path else ""
+                            file_extension = (
+                                f".{file_path.split('.')[-1]}"
+                                if "." in file_path
+                                else ""
+                            )
                             temp_file_path = None
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+                            with tempfile.NamedTemporaryFile(
+                                delete=False, suffix=file_extension
+                            ) as temp_file:
                                 temp_file.write(raw_content)
                                 temp_file_path = temp_file.name
-                            
+
                             loader = DoclingLoader(temp_file_path)
                             loaded_documents = loader.load()
                             for doc in loaded_documents:
@@ -73,4 +86,13 @@ def frappe_retriever(state, tool_call_id, team_ids):
     except Exception as e:
         raise ToolException(f"Failed to retrieve documents from Frappe Drive: {e}")
 
-    return Command(update={"documents": documents, "messages": [ToolMessage("Retrieved documents from Frappe Drive.", tool_call_id=tool_call_id)]})
+    return Command(
+        update={
+            "documents": documents,
+            "messages": [
+                ToolMessage(
+                    "Retrieved documents from Frappe Drive.", tool_call_id=tool_call_id
+                )
+            ],
+        }
+    )

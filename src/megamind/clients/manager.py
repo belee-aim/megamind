@@ -2,6 +2,7 @@ from typing import Optional
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from megamind.utils.config import settings
 
+
 class ClientManager:
     def __init__(self):
         self._client: Optional[MultiServerMCPClient] = None
@@ -13,7 +14,9 @@ class ClientManager:
                 {
                     "erpnext": {
                         "command": "node",
-                        "args": ["/home/skele/code/frappe_mcp_server/build/index.js"], # Make this path configurable if needed
+                        "args": [
+                            "/home/skele/code/frappe_mcp_server/build/index.js"
+                        ],  # Make this path configurable if needed
                         "transport": "stdio",
                         "env": {
                             "FRAPPE_URL": settings.frappe_url,
@@ -29,5 +32,6 @@ class ClientManager:
         if self._client is None:
             raise RuntimeError("Client not initialized. Call initialize_client first.")
         return self._client
+
 
 client_manager = ClientManager()

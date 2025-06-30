@@ -17,7 +17,7 @@ def check_cache_node(state: AgentState, config: RunnableConfig):
     logger.debug("---CHECK CACHE NODE---")
     configurable = Configuration.from_runnable_config(config)
 
-    human_message = get_human_message(state)   
+    human_message = get_human_message(state)
 
     if not human_message:
         raise ValueError("No human message found in the state.")

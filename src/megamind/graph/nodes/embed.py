@@ -11,6 +11,7 @@ from megamind.configuration import Configuration
 from megamind.utils import get_human_message
 from ..states import AgentState
 
+
 def embed_node(state: AgentState, config: RunnableConfig):
     """
     Processes documents, embeds them, and stores them in a vector store.
@@ -39,7 +40,7 @@ def embed_node(state: AgentState, config: RunnableConfig):
     # Embed and store documents
     embeddings = GoogleGenerativeAIEmbeddings(model=configurable.embedding_model)
     supabase_client = get_supabase_client()
-    
+
     vector_store = SupabaseVectorStore.from_documents(
         documents=chunked_documents,
         embedding=embeddings,
@@ -49,7 +50,7 @@ def embed_node(state: AgentState, config: RunnableConfig):
     )
 
     retrieved_documents = []
-    human_message = get_human_message(state)   
+    human_message = get_human_message(state)
 
     if not human_message:
         raise ValueError("No human message found in the state.")
@@ -59,5 +60,5 @@ def embed_node(state: AgentState, config: RunnableConfig):
             query=str(human_message.content), filter={"team_id": team_id}
         )
         retrieved_documents.extend(documents)
-    
+
     return {"documents": retrieved_documents}

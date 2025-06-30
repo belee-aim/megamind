@@ -35,16 +35,14 @@ async def read_root():
     logger.info("Root endpoint accessed")
     return {"message": "Welcome to the Megamindesu API"}
 
+
 @app.post("/api/v1/stream")
-async def stream(
-    request: Request,
-    request_data: ChatRequest
-):
+async def stream(request: Request, request_data: ChatRequest):
     """
     Endpoint to chat with AI models.
     Streams the response from the AI model.
     """
-    
+
     try:
         # Extract the cookie from the request
         cookie = request.headers.get("cookie")
@@ -62,13 +60,13 @@ async def stream(
                     event_str = "event: stream_event\n"
                     for line in str(chunk.content).splitlines():
                         data_str = f"data: {line}\n"
-                        yield (event_str + data_str).encode('utf-8')
+                        yield (event_str + data_str).encode("utf-8")
                     yield "\n"
 
         return StreamingResponse(stream_response(), media_type="text/event-stream")
 
-
     except HTTPException as e:
+        logger.error(f"Unexpected error in chat endpoint: {e}")
         raise e
     except Exception as e:
         logger.error(f"Unexpected error in chat endpoint: {e}")

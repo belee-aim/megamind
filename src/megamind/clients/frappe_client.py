@@ -2,6 +2,7 @@ import requests
 from loguru import logger
 from ..utils.config import settings
 
+
 class FrappeClient:
     def __init__(self, cookie: str | None = None):
         self.frappe_url = settings.frappe_url
@@ -23,7 +24,7 @@ class FrappeClient:
             response = requests.get(
                 f"{self.frappe_url}/api/method/drive.api.permissions.get_teams",
                 headers=self.headers,
-                params={"details": 1}
+                params={"details": 1},
             )
             response.raise_for_status()
             return response.json().get("message", {})
@@ -44,15 +45,15 @@ class FrappeClient:
             params = {"team": team}
             if entity_name:
                 params["entity_name"] = entity_name
-            
+
             response = requests.get(
                 f"{self.frappe_url}/api/method/drive.api.list.files",
                 headers=self.headers,
-                params=params
+                params=params,
             )
             response.raise_for_status()
             files = response.json().get("message", [])
-            
+
             for file in files:
                 if file.get("is_group") == 1:
                     all_files.extend(self.get_files(team, file.get("name")))
@@ -70,13 +71,13 @@ class FrappeClient:
         """
         if not self.frappe_url:
             return None
-            
+
         try:
             params = {"entity_name": file_name}
             file_response = requests.get(
                 f"{self.frappe_url}/api/method/drive.api.files.get_file_content",
                 headers=self.headers,
-                params=params
+                params=params,
             )
             file_response.raise_for_status()
             return file_response.content

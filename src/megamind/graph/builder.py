@@ -16,7 +16,11 @@ def route_tools(state: AgentState) -> str:
     """
     Routes to the appropriate tool node based on the agent's decision.
     """
-    if "messages" not in state or not isinstance(state["messages"], list) or len(state["messages"]) == 0:
+    if (
+        "messages" not in state
+        or not isinstance(state["messages"], list)
+        or len(state["messages"]) == 0
+    ):
         return END
 
     last_message = state["messages"][-1]
