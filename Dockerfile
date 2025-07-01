@@ -1,6 +1,17 @@
 # Use a specific version of Python for reproducibility
 FROM python:3.12-slim as builder
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+###############################################################
+# Install git and ssh client
+RUN apt-get update && apt-get install -y openssh-client git
+
+# Set up SSH to trust the Git provider's host key automatically
+# This prevents interactive prompts that would break the build
+RUN mkdir -p -m 0700 ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts
+###############################################################
 
 # Set the working directory
 WORKDIR /app
@@ -14,6 +25,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy the application source code
 COPY pyproject.toml uv.lock /app/
 COPY src/ /app/src
+# Clone the frappe_mcp_server repository
+RUN --mount=type=ssh,id=default \
+    git clone git@github.com:AIMlink-team/frappe_mcp_server.git /app/frappe_mcp_server
+
+# Install dependencies for frappe_mcp_server
+RUN cd /app/frappe_mcp_server && npm install
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -21,6 +38,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Final stage
 FROM python:3.12-slim
+
+# Install Node.js and npm
+RUN apt-get update && apt-get install -y nodejs npm
 
 # Create a non-root user
 RUN addgroup --system app && adduser --system --group app
@@ -31,6 +51,8 @@ WORKDIR /app
 # Copy installed packages from the builder stage
 # Copy the environment, but not the source code
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --from=builder --chown=app:app /app/frappe_mcp_server /app/frappe_mcp_server
+
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"

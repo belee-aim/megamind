@@ -8,13 +8,18 @@ services:
     image: megamind
     # The command to run the app. This should match the CMD in your Dockerfile.
     # It can be omitted here if the Dockerfile's CMD is sufficient.
-    command: uvicorn megamind.main:app --host 0.0.0.0 --port 8000
+    # command: uvicorn megamind.main:app --host 0.0.0.0 --port 8000
     # Expose the port to the internal Docker network for Nginx to connect to.
     # This does not publish the port to the host machine.
     env_file:
       - .env
     expose:
       - 8000
+    volumes:
+      - $SSH_AUTH_SOCK:/ssh-agent:ro
+    # Set environment variables for the container
+    environment:
+      - SSH_AUTH_SOCK=/ssh-agent
 
   nginx:
     # Use the latest stable nginx image

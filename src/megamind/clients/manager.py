@@ -15,7 +15,7 @@ class ClientManager:
                     "erpnext": {
                         "command": "node",
                         "args": [
-                            "/home/skele/code/frappe_mcp_server/build/index.js"
+                            settings.frappe_mcp_server_path
                         ],  # Make this path configurable if needed
                         "transport": "stdio",
                         "env": {
