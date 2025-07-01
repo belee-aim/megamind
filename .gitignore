@@ -130,3 +130,6 @@ images/
 
 # Supabase
 supabase/.temp/
+
+# Notebooks
+notebooks/
