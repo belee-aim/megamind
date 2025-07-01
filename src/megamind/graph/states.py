@@ -1,5 +1,5 @@
 from langchain_core.documents import Document
-from typing import List, Annotated, TypedDict
+from typing import List, Annotated, Literal, TypedDict
 from langgraph.graph.message import add_messages
 from langchain_core.messages.utils import AnyMessage
 
@@ -9,3 +9,4 @@ class AgentState(TypedDict):
     team_ids: List[str]
     documents: List[Document]
     cookie: str | None
+    next_node: Literal["rag_node", "agent_node"] | None

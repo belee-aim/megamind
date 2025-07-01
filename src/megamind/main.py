@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.params import Query
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from loguru import logger
@@ -37,7 +39,10 @@ async def read_root():
 
 
 @app.post("/api/v1/stream")
-async def stream(request: Request, request_data: ChatRequest):
+async def stream(
+    request: Request,
+    request_data: ChatRequest,
+):
     """
     Endpoint to chat with AI models.
     Streams the response from the AI model.
@@ -51,6 +56,7 @@ async def stream(request: Request, request_data: ChatRequest):
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
+            "next_node": request_data.direct_route,
         }
 
         async def stream_response():

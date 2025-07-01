@@ -4,6 +4,8 @@ from loguru import logger
 
 from megamind.clients.manager import client_manager
 from megamind.configuration import Configuration
+from megamind.graph.nodes.rag import rag_node
+from megamind.graph.nodes.router import continue_to_agent, router_node
 
 from .states import AgentState
 from .nodes.agent import agent_node
@@ -42,7 +44,9 @@ async def build_graph():
 
     # Add nodes
     workflow.add_node("check_cache", check_cache_node)
-    workflow.add_node("agent", agent_node)
+    workflow.add_node("router_node", router_node)
+    workflow.add_node("agent_node", agent_node)
+    workflow.add_node("rag_node", rag_node)
     workflow.add_node("frappe_retriever_tool", ToolNode([frappe_retriever]))
     tools = await mcp_client.get_tools()
     workflow.add_node("erpnext_mcp_tool", ToolNode(tools))
@@ -50,10 +54,14 @@ async def build_graph():
 
     # Set the entry point
     workflow.set_entry_point("check_cache")
-    workflow.add_edge("check_cache", "agent")
+
+    workflow.add_edge("check_cache", "router_node")
+    workflow.add_conditional_edges(
+        "router_node", continue_to_agent, ["rag_node", "agent_node"]
+    )
 
     workflow.add_conditional_edges(
-        "agent",
+        "agent_node",
         route_tools,
         {
             "frappe_retriever_tool": "frappe_retriever_tool",
@@ -64,8 +72,10 @@ async def build_graph():
 
     # Add edges
     workflow.add_edge("frappe_retriever_tool", "process_and_embed")
-    workflow.add_edge("process_and_embed", "agent")
-    workflow.add_edge("erpnext_mcp_tool", "agent")
+    workflow.add_conditional_edges(
+        "process_and_embed", continue_to_agent, ["rag_node", "agent_node"]
+    )
+    workflow.add_edge("erpnext_mcp_tool", "agent_node")
 
     # Compile the graph
     app = workflow.compile()

@@ -18,13 +18,9 @@ class Configuration(BaseModel):
         description="The name of the language model to use for the agent's query generation.",
     )
 
-    grader_model: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
-        description="The name of the language model to use for grading document relevancy.",
-    )
-
-    max_research_loops: int = Field(
-        default=2, description="The maximum number of research loops to perform."
+    router_model: str = Field(
+        default="gemini-2.0-flash",
+        description="The name of the language model to use for routing graph nodes.",
     )
 
     @classmethod
