@@ -29,6 +29,9 @@ COPY src/ /app/src
 RUN --mount=type=ssh,id=default \
     git clone git@github.com:AIMlink-team/frappe_mcp_server.git /app/frappe_mcp_server
 
+# Install Node.js and npm
+RUN apt-get update && apt-get install -y nodejs npm
+
 # Install dependencies for frappe_mcp_server
 RUN cd /app/frappe_mcp_server && npm install
 
