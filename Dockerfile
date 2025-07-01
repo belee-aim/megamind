@@ -32,8 +32,8 @@ RUN --mount=type=ssh,id=default \
 # Install Node.js and npm
 RUN apt-get update && apt-get install -y nodejs npm
 
-# Install dependencies for frappe_mcp_server
-RUN cd /app/frappe_mcp_server && npm install
+# Install dependencies for frappe_mcp_server && build the project
+RUN cd /app/frappe_mcp_server && npm install && npm run build
 
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
