@@ -2,9 +2,9 @@
 
 ## High-Level Architecture
 
-This application is a FastAPI-based microservice designed to interact with AI models. It uses `langgraph` to create a stateful, multi-actor system that processes user requests in a structured manner. The core of the application is a graph-based state machine that orchestrates the flow of data and logic, from receiving a user's chat message to generating a final response.
+This application is a FastAPI-based microservice designed to interact with AI models. It uses `langgraph` to create a stateful, multi-actor system that processes user requests in a structured and dynamic manner. The core of the application is a graph-based state machine that orchestrates the flow of data and logic, from receiving a user's chat message to generating a final response.
 
-The application is designed to be modular, with clear separation of concerns between the API layer, the graph definition, and the individual nodes that make up the graph. This allows for easier maintenance and extension of the application's capabilities.
+The graph is designed to be intelligent, with a routing mechanism that determines the best path for a given query. It can choose between a retrieval-augmented generation (RAG) approach for simple, document-based questions and a more complex agentic workflow for tasks that require reasoning and tool use. This allows the application to handle a wide range of queries efficiently and effectively.
 
 ## Detailed Component Breakdown
 
@@ -12,45 +12,53 @@ The application is designed to be modular, with clear separation of concerns bet
 
 This file serves as the entry point for the application. It initializes the FastAPI application and defines the API endpoints.
 
--   **`@app.post("/api/v1/stream")`**: This is the primary endpoint for interacting with the AI. It receives a `ChatRequest` object containing the user's prompt. The endpoint is responsible for:
-    1.  Invoking the graph with the user's message.
-    2.  Streaming the response back to the client using `StreamingResponse`.
+-   **`lifespan` context manager**: This function is responsible for initializing the `langgraph` graph when the application starts up, ensuring it is ready to handle requests.
+-   **`@app.post("/api/v1/stream")`**: This is the primary endpoint for interacting with the AI. It receives a `ChatRequest` object and streams the response back to the client. It passes the user's message, along with any routing directives, to the graph for processing.
 
 ### `src/megamind/graph/builder.py`
 
 This file is responsible for constructing the `langgraph` state machine.
 
 -   **`build_graph()`**: This function defines the structure of the graph, including its nodes and edges.
-    -   **Nodes**: The graph consists of four main nodes:
-        -   `check_cache`: The entry point of the graph, which checks if a response is available in the cache.
-        -   `frappe_retriever_tool`: A `ToolNode` that makes the `frappe_retriever` tool available to the graph. This allows the AI model to dynamically decide whether to call the Frappe API to retrieve additional information.
-        -   `process_and_embed`: A node that processes and embeds the data retrieved by the `frappe_retriever_tool`.
-        -   `generate`: A node that generates the final response. This node can also decide to call the `frappe_retriever_tool` if more information is needed.
-    -   **Edges**: The function defines a cyclical flow where the `generate` node can call the `frappe_retriever_tool`, which then sends its output to the `process_and_embed` node, and finally back to the `generate` node. This loop allows the AI to gather information iteratively until it has enough context to generate a complete response.
+    -   **Nodes**: The graph consists of several nodes, each with a specific role:
+        -   `check_cache`: The entry point, which first checks if a similar query has been answered before.
+        -   `router_node`: A conditional router that decides the next step based on the user's query, directing the flow to either the `rag_node` or the `agent_node`.
+        -   `rag_node`: A node that generates a response using a retrieval-augmented generation approach, suitable for straightforward questions.
+        -   `agent_node`: A more advanced node that can reason, use tools, and interact with external systems to answer complex queries.
+        -   `frappe_retriever_tool`: A `ToolNode` that allows the agent to retrieve data from the Frappe API.
+        -   `erpnext_mcp_tool`: A `ToolNode` for interacting with an ERPNext MCP server, enabling the agent to perform actions within the ERP system.
+        -   `process_and_embed`: A node that processes and creates embeddings for the data retrieved by the `frappe_retriever_tool`.
+    -   **Edges**: The function defines a sophisticated flow with conditional routing, allowing the graph to dynamically adapt to the user's request. The `agent_node` can call tools in a loop, processing the results until it has enough information to generate a final response.
 
 ### `src/megamind/graph/states.py`
 
 This file defines the state object for the agent.
 
--   **`AgentState`**: A `TypedDict` that represents the state of the graph. It contains fields for the user's question, messages, and other relevant data that is passed between the nodes. This state is updated by each node as the graph is executed.
+-   **`AgentState`**: A `TypedDict` that represents the state of the graph. It contains fields for messages, documents, team IDs, and other data that is passed between nodes.
 
 ### `src/megamind/graph/nodes/`
 
 This directory contains the functions that define the logic for each node in the graph.
 
--   **`check_cache.py`**: The `check_cache_node` function retrieves all teams for the user, checks if a similar question has been answered before for each team, and is available in the cache.
--   **`embedder.py`**: The `embedder_node` function processes the data retrieved from Frappe, cleans the content, and creates embeddings for it.
--   **`generate.py`**: The `generate_node` function is responsible for generating the final response. It takes the retrieved documents and the conversation history as input and uses a language model to generate a coherent and contextually relevant answer. This node can also decide to call the `frappe_retriever_tool` if more information is needed.
+-   **`check_cache.py`**: The `check_cache_node` function checks for cached responses to similar questions.
+-   **`router.py`**: The `router_node` function uses a language model to determine whether a query should be handled by the `rag_node` or the `agent_node`.
+-   **`agent.py`**: The `agent_node` function is the primary reasoning engine of the graph. It can use tools like `frappe_retriever` and the ERPNext MCP to gather information and generate a comprehensive response.
+-   **`rag.py`**: The `rag_node` function generates a response based on retrieved documents, suitable for answering factual questions.
+-   **`embed.py`**: The `embed_node` function processes and creates embeddings for the data retrieved from Frappe.
 
 ### `src/megamind/graph/tools/`
 
 This directory contains tools that can be called by the agent during the graph's execution.
 
--   **`frappe_retriever.py`**: This file defines the `frappe_retriever` tool, which is responsible for retrieving data from the Frappe API. By defining it as a tool, the AI model can decide to call it dynamically when it needs to fetch additional information to answer a user's query.
+-   **`frappe_retriever.py`**: This file defines the `frappe_retriever` tool, which allows the agent to dynamically fetch data from the Frappe API.
 
-### `src/megamind/clients/frappe_client.py`
+### `src/megamind/clients/`
 
-This file contains the client for interacting with the Frappe API. It handles the authentication and communication with the Frappe server.
+This directory contains clients for interacting with external services.
+
+-   **`frappe_client.py`**: Contains the client for authenticating and communicating with the Frappe API.
+-   **`supa_client.py`**: A client for interacting with a Supabase instance.
+-   **`manager.py`**: Manages the initialization and retrieval of clients.
 
 ### `src/megamind/models/`
 
@@ -58,13 +66,12 @@ This directory contains the data models for the application.
 
 -   **`requests.py`**: Defines the `ChatRequest` model for the data received by the `/api/v1/stream` endpoint.
 
-### `src/megamind/utils/config.py`
+### `src/megamind/utils/`
 
-This file manages the application's configuration, including loading environment variables and making them available to the rest of the application.
+This directory contains utility functions for the application.
 
-### `src/megamind/utils/logger.py`
-
-This file sets up a centralized logging system for the application using `loguru`. It ensures that all logs are structured and consistent, with support for JSON formatting.
+-   **`config.py`**: Manages the application's configuration, including loading environment variables.
+-   **`logger.py`**: Sets up a centralized logging system using `loguru`.
 
 ## Visual Representation
 
@@ -73,14 +80,21 @@ graph TD
     A[User Request: /api/v1/stream] --> B{src/megamind/main.py};
     B --> C{build_graph};
     C -- Entry Point --> D[check_cache_node];
-    D --> E{generate_node};
-    subgraph "Tool Calling Loop"
-        E -- Call Tool? --> F[Yes];
-        F --> G{frappe_retriever_tool};
-        G --> H{process_and_embed_node};
-        H --> E;
+    D --> E{router_node};
+    E -- Route --> F{rag_node};
+    E -- Route --> G{agent_node};
+
+    subgraph "Agent Tool Calling Loop"
+        G -- Call Tool? --> H{Yes};
+        H --> I{frappe_retriever_tool};
+        H --> J{erpnext_mcp_tool};
+        I --> K{process_and_embed};
+        K --> G;
+        J --> G;
     end
-    E -- Finish --> I[End];
+
+    F -- Finish --> L[End];
+    G -- Finish --> L;
 ```
 
 ## Database Migrations
