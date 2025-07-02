@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode, tools_condition
-from loguru import logger
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from megamind.clients.manager import client_manager
 from megamind.configuration import Configuration
@@ -35,7 +35,7 @@ def route_tools(state: AgentState) -> str:
         return "erpnext_mcp_tool"
 
 
-async def build_graph():
+async def build_graph(checkpointer: AsyncPostgresSaver = None):
     """
     Builds and compiles the LangGraph for the agent.
     """
@@ -75,7 +75,7 @@ async def build_graph():
         "rag_node",
         tools_condition,
         {
-            "frappe_retriever_tool": "frappe_retriever_tool",
+            "tools": "frappe_retriever_tool",
             END: END,
         },
     )
@@ -88,5 +88,5 @@ async def build_graph():
     workflow.add_edge("erpnext_mcp_tool", "agent_node")
 
     # Compile the graph
-    app = workflow.compile()
+    app = workflow.compile(checkpointer=checkpointer)
     return app

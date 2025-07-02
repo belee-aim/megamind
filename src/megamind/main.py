@@ -1,16 +1,16 @@
 from contextlib import asynccontextmanager
-from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.params import Query
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage
 from loguru import logger
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from megamind.clients.manager import client_manager
 from megamind.graph import build_graph
 from megamind.models.requests import ChatRequest
 from megamind.utils.logger import setup_logging
+from megamind.utils.config import settings
 
 setup_logging()
 
@@ -18,9 +18,15 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # build the graph
-    graph = await build_graph()
-    app.state.graph = graph
-    yield
+    async with AsyncPostgresSaver.from_conn_string(
+        settings.supabase_connection_string
+    ) as checkpointer:
+        # First time execution will create the necessary tables
+        # await checkpointer.setup()
+
+        graph = await build_graph(checkpointer)
+        app.state.graph = graph
+        yield
 
 
 app = FastAPI(
@@ -37,10 +43,19 @@ async def read_root():
     return {"message": "Welcome to the Megamindesu API"}
 
 
+def get_sid_from_cookie(request: Request):
+    """
+    Extracts the session ID from the cookie in the request.
+    """
+    sid = request.cookies.get("sid")
+    if not sid:
+        raise HTTPException(status_code=400, detail="Session ID not found in cookies")
+    return sid
+
+
 @app.post("/api/v1/stream")
 async def stream(
-    request: Request,
-    request_data: ChatRequest,
+    request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
 ):
     """
     Endpoint to chat with AI models.
@@ -57,11 +72,14 @@ async def stream(
             "cookie": cookie,
             "next_node": request_data.direct_route,
         }
+        config = RunnableConfig(configurable={"thread_id": sid})
 
         async def stream_response():
             graph = request.app.state.graph
             try:
-                async for chunk, _ in graph.astream(inputs, stream_mode="messages"):
+                async for chunk, _ in graph.astream(
+                    inputs, config, stream_mode="messages"
+                ):
                     if isinstance(chunk, AIMessage) and chunk.content:
                         event_str = "event: stream_event\n"
                         for line in str(chunk.content).splitlines():
