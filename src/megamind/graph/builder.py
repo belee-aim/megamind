@@ -73,7 +73,7 @@ async def build_graph():
 
     workflow.add_conditional_edges(
         "rag_node",
-        route_tools,
+        tools_condition,
         {
             "frappe_retriever_tool": "frappe_retriever_tool",
             END: END,
