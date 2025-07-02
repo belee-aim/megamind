@@ -39,6 +39,7 @@ async def build_graph():
     """
     Builds and compiles the LangGraph for the agent.
     """
+    client_manager.initialize_client()
     workflow = StateGraph(AgentState, config_schema=Configuration)
     mcp_client = client_manager.get_client()
 
@@ -66,6 +67,15 @@ async def build_graph():
         {
             "frappe_retriever_tool": "frappe_retriever_tool",
             "erpnext_mcp_tool": "erpnext_mcp_tool",
+            END: END,
+        },
+    )
+
+    workflow.add_conditional_edges(
+        "rag_node",
+        route_tools,
+        {
+            "frappe_retriever_tool": "frappe_retriever_tool",
             END: END,
         },
     )

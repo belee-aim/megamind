@@ -18,7 +18,6 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # build the graph
-    client_manager.initialize_client()
     graph = await build_graph()
     app.state.graph = graph
     yield

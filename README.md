@@ -17,6 +17,13 @@ Then, run the fastapi server in development mode by running below script.
 uv run fastapi dev src/megamind/main.py
 ```
 
+If you want to see the graph in visual mode run the scripts below.
+
+```bash
+uv pip install -e .
+langgraph dev
+```
+
 
 To generate image of the graph  
 
