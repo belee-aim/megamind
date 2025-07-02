@@ -30,3 +30,9 @@ To generate image of the graph
 ```bash
  python generate_graph_image.py
 ```
+
+## Repository or Websites used for inspiration
+
+- [Github - Gemini Langchain](https://github.com/google-gemini/gemini-fullstack-langgraph-quickstart)
+- [Google Langgraph example](https://ai.google.dev/gemini-api/docs/langgraph-example)
+- [Langgraph documentation](https://langchain-ai.github.io/langgraph/agents/agents/)
