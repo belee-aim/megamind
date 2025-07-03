@@ -46,7 +46,7 @@ def router_node(state: AgentState, config: RunnableConfig):
 
 def continue_to_agent(
     state: AgentState,
-) -> Literal["rag_node", "agent_node"]:
+) -> Literal["rag_node", "agent_node", "stock_movement_agent_node"]:
     """
     Determines the next node based on the state.
     """
