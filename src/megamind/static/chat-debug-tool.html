@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Debug Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 20px 20px 0 0;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .chat-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: linear-gradient(145deg, #f8fafc, #f1f5f9);
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #e5e7eb;
+            background: #f9fafb;
+            flex-shrink: 0;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .form-row:not(:last-child) {
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .reset-btn:hover {
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 15px;
+            position: relative;
+            animation: slideIn 0.3s ease;
+            max-width: 80%;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.assistant {
+            background: white;
+            border: 2px solid #e5e7eb;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+
+        .message.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .message-content {
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #question {
+            flex-grow: 1;
+        }
+
+        /* Scrollbar styling */
+        .chat-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-area::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .chat-area::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Chat Debug Tool</h1>
+            <p>API Testing Interface</p>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div class="message assistant">
+                <div class="message-header">🤖 Assistant</div>
+                <div class="message-content">Сайн байна уу! Би танд Stock Movement API тест хийхэд тусламж үзүүлэх debug tool байна.</div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="apiUrl">API URL</label>
+                    <input type="text" id="apiUrl" value="/api/v1/stock-movement/stream">
+                </div>
+                <div class="form-group">
+                    <label for="sessionId">Session ID</label>
+                    <input type="text" id="sessionId" value="Guest1234">
+                </div>
+                 <div class="form-group">
+                    <label for="company">Company</label>
+                    <select id="company">
+                        <option value="vup (Demo)">vup (Demo)</option>
+                        <option value="Another Company">Another Company</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chat-input-container">
+                <input type="text" id="question" placeholder="Enter your question...">
+                <button class="btn" onclick="sendMessage()">Send</button>
+                <button class="btn reset-btn" onclick="startNewChat()">RESET</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function startNewChat() {
+            // Generate a new session ID
+            document.getElementById('sessionId').value = 'Guest' + Math.floor(Math.random() * 10000);
+
+            // Clear the chat history
+            const chatArea = document.getElementById('chatArea');
+            chatArea.innerHTML = `
+                <div class="message assistant">
+                    <div class="message-header">🤖 Assistant</div>
+                    <div class="message-content">Сайн байна уу! Би танд Stock Movement API тест хийхэд тусламж үзүүлэх debug tool байна.</div>
+                </div>
+            `;
+        }
+
+        async function sendMessage() {
+            const question = document.getElementById('question').value.trim();
+            if (!question) return;
+
+            const chatArea = document.getElementById('chatArea');
+            
+            // Add user message
+            const userMessage = document.createElement('div');
+            userMessage.className = 'message user';
+            userMessage.innerHTML = `<div class="message-header">👤 You</div><div class="message-content">${question}</div>`;
+            chatArea.appendChild(userMessage);
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            // Clear input
+            document.getElementById('question').value = '';
+
+            // Create assistant message container
+            const assistantMessage = document.createElement('div');
+            assistantMessage.className = 'message assistant';
+            assistantMessage.innerHTML = `<div class="message-header">🤖 Assistant</div><div class="message-content"></div>`;
+            chatArea.appendChild(assistantMessage);
+            const messageContent = assistantMessage.querySelector('.message-content');
+            
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner';
+            messageContent.appendChild(spinner);
+
+            try {
+                const apiUrl = document.getElementById('apiUrl').value;
+                const sessionId = document.getElementById('sessionId').value;
+                const company = document.getElementById('company').value;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cookie': `sid=${sessionId}`
+                    },
+                    body: JSON.stringify({ question, company })
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+                let buffer = '';
+                messageContent.removeChild(spinner);
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    let eolIndex;
+                    while ((eolIndex = buffer.indexOf('\n')) >= 0) {
+                        const line = buffer.slice(0, eolIndex).trim();
+                        buffer = buffer.slice(eolIndex + 1);
+
+                        if (line.startsWith('data: ')) {
+                            const data = line.substring(6);
+                            fullResponse += data + '\n';
+                            messageContent.textContent = fullResponse;
+                            chatArea.scrollTop = chatArea.scrollHeight;
+                        }
+                    }
+                }
+            } catch (error) {
+                messageContent.parentElement.classList.add('error');
+                messageContent.textContent = `Failed to connect to API: ${error.message}`;
+            }
+        }
+
+        document.getElementById('question').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        document.getElementById('question').focus();
+    </script>
+</body>
+</html>
