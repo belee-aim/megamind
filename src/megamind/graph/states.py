@@ -9,4 +9,6 @@ class AgentState(TypedDict):
     team_ids: List[str]
     documents: List[Document]
     cookie: str | None
+    company: str | None
+    last_stock_entry_id: str | None
     next_node: Literal["rag_node", "agent_node", "stock_movement_agent_node"] | None

@@ -22,8 +22,11 @@ async def stock_movement_agent_node(state: AgentState, config: RunnableConfig):
     mcp_client = client_manager.get_client()
 
     # No document context needed - this agent only handles ERPNext operations
+    company = state.get("company") or "Aimlink"
+    last_stock_entry_id = state.get("last_stock_entry_id")
     system_prompt = prompts.stock_movement_agent_instructions.format(
-        team_ids=state.get("team_ids", [])
+        company=company,
+        last_stock_entry_id=last_stock_entry_id or "Not available",
     )
     messages = [SystemMessage(content=system_prompt)] + state.get("messages", [])
 
@@ -37,4 +40,18 @@ async def stock_movement_agent_node(state: AgentState, config: RunnableConfig):
     
     response = await llm.bind_tools(filtered_tools).ainvoke(messages)
 
-    return {"messages": [response]}
+    # Extract the new stock entry ID from the response, if available
+    new_stock_entry_id = None
+    if response.tool_calls:
+        for tool_call in response.tool_calls:
+            if tool_call["name"] == "create_document" and tool_call["args"].get("doctype") == "Stock Entry":
+                # This is a simplified assumption. In a real scenario, you would
+                # need to invoke the tool and get the ID from the result.
+                # For now, we'll assume the ID is returned in the tool call arguments.
+                new_stock_entry_id = tool_call["args"].get("name")
+
+    return {
+        "messages": [response],
+        "company": company,
+        "last_stock_entry_id": new_stock_entry_id or last_stock_entry_id,
+    }

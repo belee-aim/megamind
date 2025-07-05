@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -36,6 +37,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.mount("/static", StaticFiles(directory="src/megamind/static"), name="static")
+
+
+@app.get("/chat-debug-tool", response_class=HTMLResponse)
+async def get_chat_ui():
+    with open("src/megamind/static/chat-debug-tool.html", "r") as f:
+        return f.read()
+
 
 @app.get("/")
 async def read_root():
@@ -47,10 +56,7 @@ def get_sid_from_cookie(request: Request):
     """
     Extracts the session ID from the cookie in the request.
     """
-    sid = request.cookies.get("sid")
-    if not sid:
-        raise HTTPException(status_code=400, detail="Session ID not found in cookies")
-    return sid
+    return request.cookies.get("sid") or "guest"
 
 
 @app.post("/api/v1/stream")
@@ -127,10 +133,12 @@ async def stock_movement_stream(
         cookie = request.headers.get("cookie")
 
         # Invoke the graph with direct routing to stocks movement agent
+        company = request_data.company or None
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
             "next_node": "stock_movement_agent_node",  # Direct route to stock movement agent
+            "company": company,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
 
