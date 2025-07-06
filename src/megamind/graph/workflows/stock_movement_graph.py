@@ -5,8 +5,9 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from megamind.clients.manager import client_manager
 from megamind.configuration import Configuration
 
-from .states import AgentState
-from .nodes.stock_movement_agent import stock_movement_agent_node
+from megamind.graph.states import AgentState
+from megamind.graph.nodes.stock_movement_agent import stock_movement_agent_node
+
 
 def route_tools_from_stock_movement(state: AgentState) -> str:
     """

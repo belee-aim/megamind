@@ -7,11 +7,11 @@ from megamind.configuration import Configuration
 from megamind.graph.nodes.rag import rag_node
 from megamind.graph.nodes.router import continue_to_agent, router_node
 
-from .states import AgentState
-from .nodes.agent import agent_node
-from .nodes.check_cache import check_cache_node
-from .tools.frappe_retriever import frappe_retriever
-from .nodes.embed import embed_node
+from ..states import AgentState
+from ..nodes.agent import agent_node
+from ..nodes.check_cache import check_cache_node
+from ..tools.frappe_retriever import frappe_retriever
+from ..nodes.embed import embed_node
 
 
 def route_tools_from_agent(state: AgentState) -> str:
