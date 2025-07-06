@@ -1,10 +1,15 @@
 import os
+import asyncio
+import sys
 from src.megamind.graph.builder import build_graph
 from IPython.display import Image, display
 
-if __name__ == "__main__":
+async def main():
+    # Get the query from the command-line arguments
+    query = sys.argv[1] if len(sys.argv) > 1 else ""
+
     # Build the graph
-    graph = build_graph()
+    graph = await build_graph(query=query)
 
     # Generate the mermaid PNG image
     try:
@@ -25,3 +30,6 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Error generating or saving graph image: {e}")
+
+if __name__ == "__main__":
+    asyncio.run(main())

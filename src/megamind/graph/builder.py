@@ -1,124 +1,15 @@
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from megamind.clients.manager import client_manager
-from megamind.configuration import Configuration
-from megamind.graph.nodes.rag import rag_node
-from megamind.graph.nodes.router import continue_to_agent, router_node
+from megamind.graph.rag_graph import build_rag_graph
+from megamind.graph.stock_movement_graph import build_stock_movement_graph
+from megamind.graph.nodes.router import router_node
 
-from .states import AgentState
-from .nodes.agent import agent_node
-from .nodes.stock_movement_agent import stock_movement_agent_node
-from .nodes.check_cache import check_cache_node
-from .tools.frappe_retriever import frappe_retriever
-from .nodes.embed import embed_node
-
-
-def route_tools_from_agent(state: AgentState) -> str:
-    """
-    Routes to the appropriate tool node based on the agent's decision.
-    """
-    if (
-        "messages" not in state
-        or not isinstance(state["messages"], list)
-        or len(state["messages"]) == 0
-    ):
-        return END
-
-    last_message = state["messages"][-1]
-    if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
-        return END
-
-    if last_message.tool_calls[0]["name"] == "frappe_retriever":
-        return "frappe_retriever_tool"
-    else:
-        return "erpnext_mcp_tool_agent"
-
-
-def route_tools_from_stock_movement(state: AgentState) -> str:
-    """
-    Routes to the appropriate tool node based on the stock movement agent's decision.
-    """
-    if (
-        "messages" not in state
-        or not isinstance(state["messages"], list)
-        or len(state["messages"]) == 0
-    ):
-        return END
-
-    last_message = state["messages"][-1]
-    if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
-        return END
-
-    # Stock movement agent only uses ERPNext MCP tools
-    return "erpnext_mcp_tool_stocks"
-
-
-async def build_graph(checkpointer: AsyncPostgresSaver = None):
+async def build_graph(checkpointer: AsyncPostgresSaver = None, query: str = None):
     """
     Builds and compiles the LangGraph for the agent.
     """
-    client_manager.initialize_client()
-    workflow = StateGraph(AgentState, config_schema=Configuration)
-    mcp_client = client_manager.get_client()
-
-    # Add nodes
-    workflow.add_node("check_cache", check_cache_node)
-    workflow.add_node("router_node", router_node)
-    workflow.add_node("agent_node", agent_node)
-    workflow.add_node("stock_movement_agent_node", stock_movement_agent_node)
-    workflow.add_node("rag_node", rag_node)
-    workflow.add_node("frappe_retriever_tool", ToolNode([frappe_retriever]))
-    tools = await mcp_client.get_tools()
-    workflow.add_node("erpnext_mcp_tool_agent", ToolNode(tools))
-    workflow.add_node("erpnext_mcp_tool_stocks", ToolNode(tools))
-    workflow.add_node("process_and_embed", embed_node)
-
-    # Set the entry point
-    workflow.set_entry_point("check_cache")
-
-    workflow.add_edge("check_cache", "router_node")
-    workflow.add_conditional_edges(
-        "router_node", continue_to_agent, ["rag_node", "agent_node", "stock_movement_agent_node"]
-    )
-
-    workflow.add_conditional_edges(
-        "agent_node",
-        route_tools_from_agent,
-        {
-            "frappe_retriever_tool": "frappe_retriever_tool",
-            "erpnext_mcp_tool_agent": "erpnext_mcp_tool_agent",
-            END: END,
-        },
-    )
-
-    workflow.add_conditional_edges(
-        "stock_movement_agent_node",
-        route_tools_from_stock_movement,
-        {
-            "erpnext_mcp_tool_stocks": "erpnext_mcp_tool_stocks",
-            END: END,
-        },
-    )
-
-    workflow.add_conditional_edges(
-        "rag_node",
-        tools_condition,
-        {
-            "tools": "frappe_retriever_tool",
-            END: END,
-        },
-    )
-
-    # Add edges
-    workflow.add_edge("frappe_retriever_tool", "process_and_embed")
-    workflow.add_conditional_edges(
-        "process_and_embed", continue_to_agent, ["rag_node", "agent_node", "stock_movement_agent_node"]
-    )
-    workflow.add_edge("erpnext_mcp_tool_agent", "agent_node")
-    workflow.add_edge("erpnext_mcp_tool_stocks", "stock_movement_agent_node")
-
-    # Compile the graph
-    app = workflow.compile(checkpointer=checkpointer)
-    return app
+    # a router that decides which graph to use
+    if "stock" in query.lower() or "movement" in query.lower():
+        return await build_stock_movement_graph(checkpointer)
+    else:
+        return await build_rag_graph(checkpointer)
