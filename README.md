@@ -25,11 +25,24 @@ langgraph dev
 ```
 
 
-To generate image of the graph  
+To generate an image of a specific workflow graph, run the following command:
 
 ```bash
- python generate_graph_image.py
+python generate_graph_image.py [workflow_name]
 ```
+
+Replace `[workflow_name]` with either `stock_movement` or `document`.
+
+For example:
+```bash
+python generate_graph_image.py stock_movement
+```
+This will generate `images/stock_movement_graph.png`.
+
+```bash
+python generate_graph_image.py document
+```
+This will generate `images/document_graph.png`.
 
 ## Repository or Websites used for inspiration
 

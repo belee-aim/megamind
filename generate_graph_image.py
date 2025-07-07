@@ -1,22 +1,30 @@
 import os
 import asyncio
 import sys
-from src.megamind.graph.builder import build_graph
+from src.megamind.graph.workflows.stock_movement_graph import build_stock_movement_graph
+from src.megamind.graph.workflows.document_graph import build_rag_graph
 from IPython.display import Image, display
 
 async def main():
-    # Get the query from the command-line arguments
-    query = sys.argv[1] if len(sys.argv) > 1 else ""
+    # Get the workflow from the command-line arguments
+    workflow_name = sys.argv[1] if len(sys.argv) > 1 else "stock_movement"
 
-    # Build the graph
-    graph = await build_graph(query=query)
+    # Build the graph based on the workflow name
+    if workflow_name == "stock_movement":
+        graph = await build_stock_movement_graph()
+        output_path = "images/stock_movement_graph.png"
+    elif workflow_name == "document":
+        graph = await build_rag_graph()
+        output_path = "images/document_graph.png"
+    else:
+        print(f"Unknown workflow: {workflow_name}")
+        return
 
     # Generate the mermaid PNG image
     try:
         image_bytes = graph.get_graph().draw_mermaid_png()
 
-        # Define the output path and create the directory if it doesn't exist
-        output_path = "images/graph.png"
+        # Create the directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         # Save the image to the file
