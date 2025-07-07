@@ -151,7 +151,7 @@ async def stock_movement(
         cookie = request.headers.get("cookie")
 
         # build the graph
-        graph: CompiledStateGraph = request.app.state.stock_movement
+        graph: CompiledStateGraph = request.app.state.stock_movement_graph
 
         # Invoke the graph to get the final state
         inputs = {

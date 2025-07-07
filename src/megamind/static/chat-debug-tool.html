@@ -304,12 +304,15 @@
                 const sessionId = document.getElementById('sessionId').value;
                 const company = document.getElementById('company').value;
 
+                // Set the sid cookie before making the request
+                document.cookie = `sid=${sessionId}; path=/`;
+
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Cookie': `sid=${sessionId}`
+                        'Content-Type': 'application/json'
                     },
+                    credentials: 'include',
                     body: JSON.stringify({ question, company })
                 });
 
