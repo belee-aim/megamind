@@ -11,4 +11,5 @@ class AgentState(TypedDict):
     cookie: str | None
     company: str | None
     last_stock_entry_id: str | None
+    recent_search_results: List[dict] | None
     next_node: Literal["rag_node", "agent_node", "stock_movement_agent_node"] | None

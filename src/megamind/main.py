@@ -158,6 +158,7 @@ async def stock_movement(
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
             "next_node": request_data.direct_route,
+            "company": request_data.company,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
 

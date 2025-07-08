@@ -41,10 +41,10 @@ class InventoryToolFilter:
         "Item Variant Attribute",
         
         # Other related DocTypes
-        "Delivery Note",
-        "Purchase Receipt",
-        "Delivery Note Item",
-        "Purchase Receipt Item",
+        # "Delivery Note",
+        # "Purchase Receipt",
+        # "Delivery Note Item",
+        # "Purchase Receipt Item",
     }
 
     def __init__(self, mcp_tools: List[Any]):

@@ -259,8 +259,9 @@
 
     <script>
         function startNewChat() {
-            // Generate a new session ID
-            document.getElementById('sessionId').value = 'Guest' + Math.floor(Math.random() * 10000);
+            // Generate a new session ID with timestamp
+            const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
+            document.getElementById('sessionId').value = 'Guest_' + timestamp;
 
             // Clear the chat history
             const chatArea = document.getElementById('chatArea');
@@ -351,6 +352,12 @@
 
         document.getElementById('question').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
+        });
+
+        // Generate initial timestamped session ID when page loads
+        window.addEventListener('load', () => {
+            const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
+            document.getElementById('sessionId').value = 'Guest_' + timestamp;
         });
 
         document.getElementById('question').focus();
