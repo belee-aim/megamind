@@ -241,13 +241,6 @@
                     <label for="sessionId">Session ID</label>
                     <input type="text" id="sessionId" value="Guest1234">
                 </div>
-                 <div class="form-group">
-                    <label for="company">Company</label>
-                    <select id="company">
-                        <option value="vup (Demo)">vup (Demo)</option>
-                        <option value="Another Company">Another Company</option>
-                    </select>
-                </div>
             </div>
             <div class="chat-input-container">
                 <input type="text" id="question" placeholder="Enter your question...">
@@ -303,7 +296,6 @@
             try {
                 const apiUrl = document.getElementById('apiUrl').value;
                 const sessionId = document.getElementById('sessionId').value;
-                const company = document.getElementById('company').value;
 
                 // Set the sid cookie before making the request
                 document.cookie = `sid=${sessionId}; path=/`;
@@ -314,7 +306,7 @@
                         'Content-Type': 'application/json'
                     },
                     credentials: 'include',
-                    body: JSON.stringify({ question, company })
+                    body: JSON.stringify({ question })
                 });
 
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);

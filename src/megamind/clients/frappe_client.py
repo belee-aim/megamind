@@ -84,3 +84,23 @@ class FrappeClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching file content: {e}")
             return None
+
+    def get_default_company(self):
+        """
+        Retrieves the default company from Frappe's Global Defaults.
+        """
+        if not all([self.frappe_url, self.api_key, self.api_secret]):
+            logger.warning("Frappe credentials not set. Skipping default company retrieval.")
+            return None
+
+        try:
+            response = requests.get(
+                f"{self.frappe_url}/api/resource/Global Defaults/Global Defaults",
+                headers={'Authorization': f'token {self.api_key}:{self.api_secret}'},
+            )
+            response.raise_for_status()
+            data = response.json().get("data", {})
+            return data.get("default_company")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching default company from Frappe: {e}")
+            return None
