@@ -1,59 +1,50 @@
+"""
+Stock Movement Graph - Intelligent Single-Node Workflow
+Smart stock movement processing that only requires item code and quantity from user.
+"""
+
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from megamind.clients.manager import client_manager
 from megamind.configuration import Configuration
+from megamind.graph.states import StockMovementState
 
-from megamind.graph.states import AgentState
-from megamind.graph.nodes.stock_movement_agent import stock_movement_agent_node
-
-
-def route_tools_from_stock_movement(state: AgentState) -> str:
-    """
-    Routes to the appropriate tool node based on the stock movement agent's decision.
-    """
-    if (
-        "messages" not in state
-        or not isinstance(state["messages"], list)
-        or len(state["messages"]) == 0
-    ):
-        return END
-
-    last_message = state["messages"][-1]
-    if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
-        return END
-
-    # Stock movement agent only uses ERPNext MCP tools
-    return "erpnext_mcp_tool_stocks"
+from ..nodes.stock_movement.smart_stock_movement_node import smart_stock_movement_node
 
 
 async def build_stock_movement_graph(checkpointer: AsyncPostgresSaver = None):
     """
-    Builds and compiles the LangGraph for the stock movement agent.
+    Builds the stock movement workflow using intelligent single-node approach.
+    
+    ARCHITECTURE:
+    ┌─────────────────────────────────────────────────┐
+    │         smart_stock_movement_node               │
+    │  ├─ Extract item + quantity from user input     │
+    │  ├─ Auto-populate all required fields           │
+    │  ├─ Validate item exists via MCP                │
+    │  ├─ Create Stock Entry via MCP                  │
+    │  └─ Return formatted success message            │
+    └─────────────────────────────────────────────────┘
+    
+    FEATURES:
+    - Only asks for item code and quantity
+    - Auto-warehouse selection  
+    - Enhanced error handling
+    - Mongolian language support
+    - Smart item search (exact + fuzzy)
     """
     client_manager.initialize_client()
-    workflow = StateGraph(AgentState, config_schema=Configuration)
-    mcp_client = client_manager.get_client()
+    workflow = StateGraph(StockMovementState, config_schema=Configuration)
 
-    # Add nodes
-    workflow.add_node("stock_movement_agent_node", stock_movement_agent_node)
-    tools = await mcp_client.get_tools()
-    workflow.add_node("erpnext_mcp_tool_stocks", ToolNode(tools))
+    # Add the smart node that handles everything
+    workflow.add_node("smart_stock_movement_node", smart_stock_movement_node)
 
-    # Set the entry point
-    workflow.set_entry_point("stock_movement_agent_node")
+    # Set entry point to the smart node
+    workflow.set_entry_point("smart_stock_movement_node")
 
-    workflow.add_conditional_edges(
-        "stock_movement_agent_node",
-        route_tools_from_stock_movement,
-        {
-            "erpnext_mcp_tool_stocks": "erpnext_mcp_tool_stocks",
-            END: END,
-        },
-    )
-
-    workflow.add_edge("erpnext_mcp_tool_stocks", "stock_movement_agent_node")
+    # The smart node handles everything and goes directly to END
+    workflow.add_edge("smart_stock_movement_node", END)
 
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

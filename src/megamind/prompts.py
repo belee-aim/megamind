@@ -117,7 +117,7 @@ The following MCP tools are available to you after inventory filtering:
 - `get_document` - Retrieve specific documents (Stock Entry, Item, Warehouse, etc.)
 - `list_documents` - Get lists of documents (warehouses, items, stock entries)
 - `create_document` - Create new documents (Stock Entry, Material Request, etc.)
-- `update_document` - Modify existing documents (add items, submit entries)
+- `` - Modify existing documents (add items, submit entries)
 - `delete_document` - Delete documents when necessary
 
 **Enhanced Validation Tools:**
@@ -472,17 +472,6 @@ You have three agents available:
 - If the user's query asks for a specific document that is stored in the Frappe Drive system (e.g., "show me the latest sales invoice", "retrieve the employee contract for John Doe", "What is {{any question related to the documents}}"), you must route to the `rag_node`.
 - If the user's query is related to inventory, stock movements, stock transfer, warehouse operations, Stock Entry, Stock Reconciliation, manufacture list, or any stock movement operations (e.g., "create a stock entry", "transfer materials between warehouses", "reconcile stock", "check inventory levels", "move items to different warehouse", "create material receipt"), you must route to the `stock_movement_agent_node`.
 - If the user's query is a general action that requires interaction with the ERPNext system but is not related to stock movement (e.g., "create a new sales invoice", "update the employee record for John Doe", "What is the status of the latest purchase order", "Give me company list", "Give me account list"), you must route to the `agent_node`.
-
-Output format:
-- Format your response as a JSON object with a single key `next_node`.
-    - "next_node": should be either "rag_node", "agent_node", or "stock_movement_agent_node"
-
-Example:
-```json
-{{
-    "next_node": "stock_movement_agent_node"
-}}
-```
 
 User Query:
 `{query}`

@@ -25,4 +25,6 @@ dependencies = [
     "langgraph-cli[inmem]>=0.3.3",
     "langgraph-checkpoint-postgres>=2.0.21",
     "psycopg[binary,pool]>=3.2.9",
+    "thefuzz>=0.22.1",
+    "python-levenshtein>=0.25.1",
 ]

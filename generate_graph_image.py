@@ -1,9 +1,11 @@
 import os
 import asyncio
 import sys
-from src.megamind.graph.workflows.stock_movement_graph import build_stock_movement_graph
-from src.megamind.graph.workflows.document_graph import build_rag_graph
-from IPython.display import Image, display
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+
+from megamind.graph.workflows.stock_movement_graph import build_stock_movement_graph
+from megamind.graph.workflows.document_graph import build_rag_graph
 
 async def main():
     # Get the workflow from the command-line arguments
@@ -32,9 +34,6 @@ async def main():
             f.write(image_bytes)
 
         print(f"Graph image saved to {output_path}")
-
-        # Display the image
-        display(Image(data=image_bytes))
 
     except Exception as e:
         print(f"Error generating or saving graph image: {e}")
