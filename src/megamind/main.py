@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+import io
+import pandas as pd
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +12,11 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph.state import CompiledStateGraph
 
+from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
+from megamind.graph.workflows.admin_support_graph import build_admin_support_graph
+from megamind.graph.workflows.bank_reconciliation_graph import (
+    build_bank_reconciliation_graph,
+)
 from megamind.graph.workflows.document_graph import build_rag_graph
 from megamind.graph.workflows.stock_movement_graph import build_stock_movement_graph
 from megamind.models.requests import ChatRequest
@@ -32,8 +39,15 @@ async def lifespan(app: FastAPI):
         )
         document_graph = await build_rag_graph(checkpointer=checkpointer)
 
+        admin_support_graph = await build_admin_support_graph(checkpointer=checkpointer)
+        bank_reconciliation_graph = await build_bank_reconciliation_graph(
+            checkpointer=checkpointer
+        )
+
         app.state.stock_movement_graph = stock_movement_graph
         app.state.document_graph = document_graph
+        app.state.admin_support_graph = admin_support_graph
+        app.state.bank_reconciliation_graph = bank_reconciliation_graph
         yield
 
 
@@ -197,3 +211,160 @@ async def stock_movement(
         raise HTTPException(
             status_code=500, detail=f"An unexpected error occurred: {str(e)}"
         )
+
+
+@app.post("/api/v1/admin-support/stream")
+async def admin_support(
+    request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
+):
+    """
+    Endpoint to chat with Admin Support AI Agent.
+    Streams the response from the AI model.
+    """
+
+    try:
+        # Extract the cookie from the request
+        cookie = request.headers.get("cookie")
+
+        # build the graph
+        graph: CompiledStateGraph = request.app.state.admin_support_graph
+
+        # Invoke the graph to get the final state
+        inputs = {
+            "messages": [HumanMessage(content=request_data.question)],
+            "cookie": cookie,
+            "next_node": request_data.direct_route,
+        }
+        config = RunnableConfig(configurable={"thread_id": sid})
+
+        async def stream_response():
+            try:
+                async for chunk, _ in graph.astream(
+                    inputs, config, stream_mode="messages"
+                ):
+                    if isinstance(chunk, AIMessage) and chunk.content:
+                        event_str = "event: stream_event\n"
+                        for line in str(chunk.content).splitlines():
+                            data_str = f"data: {line}\n"
+                            yield (event_str + data_str).encode("utf-8")
+                        yield b"\n"
+
+                # Signal the end of the stream to the client
+                yield "event: done\ndata: {}\n\n".encode("utf-8")
+
+            except Exception as e:
+                logger.error(f"Error during SSE stream generation: {e}")
+                # Send an error event to the client before closing
+                import json
+
+                error_data = {"message": "An error occurred during the stream."}
+                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
+                    "utf-8"
+                )
+
+        return StreamingResponse(stream_response(), media_type="text/event-stream")
+
+    except HTTPException as e:
+        logger.error(f"Unexpected error in chat endpoint: {e}")
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error in chat endpoint: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
+        )
+
+
+@app.post("/api/v1/bank-reconciliation/stream")
+async def bank_reconciliation(
+    request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
+):
+    """
+    Endpoint to chat with Bank Reconciliation AI Agent.
+    Streams the response from the AI model.
+    """
+
+    try:
+        # Extract the cookie from the request
+        cookie = request.headers.get("cookie")
+
+        # build the graph
+        graph: CompiledStateGraph = request.app.state.bank_reconciliation_graph
+
+        # Invoke the graph to get the final state
+        inputs = {
+            "messages": [HumanMessage(content=request_data.question)],
+            "cookie": cookie,
+            "next_node": request_data.direct_route,
+        }
+        config = RunnableConfig(configurable={"thread_id": sid})
+
+        async def stream_response():
+            try:
+                async for chunk, _ in graph.astream(
+                    inputs, config, stream_mode="messages"
+                ):
+                    
+                    if isinstance(chunk, AIMessage) and chunk.content:
+                        event_str = "event: stream_event\n"
+                        for line in str(chunk.content).splitlines():
+                            data_str = f"data: {line}\n"
+                            yield (event_str + data_str).encode("utf-8")
+                        yield b"\n"
+
+                # Signal the end of the stream to the client
+                yield "event: done\ndata: {}\n\n".encode("utf-8")
+
+            except Exception as e:
+                logger.error(f"Error during SSE stream generation: {e}")
+                # Send an error event to the client before closing
+                import json
+
+                error_data = {"message": "An error occurred during the stream."}
+                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
+                    "utf-8"
+                )
+
+        return StreamingResponse(stream_response(), media_type="text/event-stream")
+
+    except HTTPException as e:
+        logger.error(f"Unexpected error in chat endpoint: {e}")
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error in chat endpoint: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
+        )
+
+
+@app.post("/api/v1/reconciliation/merge")
+async def merge_api(
+    formatted_bank_file: UploadFile = File(...),
+    customers_file: UploadFile = File(...),
+):
+    # Read uploaded Excel or CSV files
+    try:
+        if formatted_bank_file.filename.endswith(".csv"):
+            formatted_bank_data = pd.read_csv(
+                io.BytesIO(await formatted_bank_file.read())
+            )
+        else:
+            formatted_bank_data = pd.read_excel(
+                io.BytesIO(await formatted_bank_file.read())
+            )
+
+        if customers_file.filename.endswith(".csv"):
+            customers_data = pd.read_csv(io.BytesIO(await customers_file.read()))
+        else:
+            customers_data = pd.read_excel(io.BytesIO(await customers_file.read()))
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {e}")
+
+    # Call the merge function
+    result_df = merge_customer_data(formatted_bank_data, customers_data)
+
+    # Replace NaN with None for JSON compatibility
+    result_df = result_df.replace({pd.NA: None, float("nan"): None})
+
+    # Return top 5 for preview (or convert to JSON)
+    return result_df.to_dict(orient="records")

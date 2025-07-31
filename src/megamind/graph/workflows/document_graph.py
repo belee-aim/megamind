@@ -12,6 +12,7 @@ from ..nodes.agent import agent_node
 from ..nodes.check_cache import check_cache_node
 from ..tools.frappe_retriever import frappe_retriever
 from ..nodes.embed import embed_node
+from ..nodes.content_agent import content_agent_node
 
 
 def route_tools_from_agent(state: AgentState) -> str:
@@ -52,6 +53,7 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
     tools = await mcp_client.get_tools()
     workflow.add_node("erpnext_mcp_tool_agent", ToolNode(tools))
     workflow.add_node("process_and_embed", embed_node)
+    workflow.add_node("content_agent", content_agent_node)
 
     # Set the entry point
     workflow.set_entry_point("check_cache")
@@ -67,7 +69,7 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
         {
             "frappe_retriever_tool": "frappe_retriever_tool",
             "erpnext_mcp_tool_agent": "erpnext_mcp_tool_agent",
-            END: END,
+            END: "content_agent",
         },
     )
 
@@ -76,7 +78,7 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
         tools_condition,
         {
             "tools": "frappe_retriever_tool",
-            END: END,
+            END: "content_agent",
         },
     )
 
@@ -86,6 +88,7 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
         "process_and_embed", continue_to_agent, ["rag_node", "agent_node"]
     )
     workflow.add_edge("erpnext_mcp_tool_agent", "agent_node")
+    workflow.add_edge("content_agent", END)
 
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)
