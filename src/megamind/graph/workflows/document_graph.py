@@ -1,21 +1,17 @@
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from megamind.clients.manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.nodes.rag import rag_node
-from megamind.graph.nodes.router import continue_to_agent, router_node
-
 from ..states import AgentState
-from ..nodes.agent import agent_node
-from ..nodes.check_cache import check_cache_node
 from ..tools.frappe_retriever import frappe_retriever
 from ..nodes.embed import embed_node
 from ..nodes.content_agent import content_agent_node
 
 
-def route_tools_from_agent(state: AgentState) -> str:
+def route_tools_from_rag(state: AgentState) -> str:
     """
     Routes to the appropriate tool node based on the agent's decision.
     """
@@ -33,7 +29,7 @@ def route_tools_from_agent(state: AgentState) -> str:
     if last_message.tool_calls[0]["name"] == "frappe_retriever":
         return "frappe_retriever_tool"
     else:
-        return "erpnext_mcp_tool_agent"
+        return "mcp_tools"
 
 
 async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
@@ -45,49 +41,30 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
     mcp_client = client_manager.get_client()
 
     # Add nodes
-    workflow.add_node("check_cache", check_cache_node)
-    workflow.add_node("router_node", router_node)
-    workflow.add_node("agent_node", agent_node)
     workflow.add_node("rag_node", rag_node)
     workflow.add_node("frappe_retriever_tool", ToolNode([frappe_retriever]))
     tools = await mcp_client.get_tools()
-    workflow.add_node("erpnext_mcp_tool_agent", ToolNode(tools))
+    workflow.add_node("mcp_tools", ToolNode(tools))
     workflow.add_node("process_and_embed", embed_node)
     workflow.add_node("content_agent", content_agent_node)
 
     # Set the entry point
-    workflow.set_entry_point("check_cache")
-
-    workflow.add_edge("check_cache", "router_node")
-    workflow.add_conditional_edges(
-        "router_node", continue_to_agent, ["rag_node", "agent_node"]
-    )
-
-    workflow.add_conditional_edges(
-        "agent_node",
-        route_tools_from_agent,
-        {
-            "frappe_retriever_tool": "frappe_retriever_tool",
-            "erpnext_mcp_tool_agent": "erpnext_mcp_tool_agent",
-            END: "content_agent",
-        },
-    )
+    workflow.set_entry_point("rag_node")
 
     workflow.add_conditional_edges(
         "rag_node",
-        tools_condition,
+        route_tools_from_rag,
         {
-            "tools": "frappe_retriever_tool",
+            "frappe_retriever_tool": "frappe_retriever_tool",
+            "mcp_tools": "mcp_tools",
             END: "content_agent",
         },
     )
 
     # Add edges
     workflow.add_edge("frappe_retriever_tool", "process_and_embed")
-    workflow.add_conditional_edges(
-        "process_and_embed", continue_to_agent, ["rag_node", "agent_node"]
-    )
-    workflow.add_edge("erpnext_mcp_tool_agent", "agent_node")
+    workflow.add_edge("process_and_embed", "rag_node")
+    workflow.add_edge("mcp_tools", "rag_node")
     workflow.add_edge("content_agent", END)
 
     # Compile the graph

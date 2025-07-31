@@ -18,11 +18,6 @@ class Configuration(BaseModel):
         description="The name of the language model to use for the agent's query generation.",
     )
 
-    router_model: str = Field(
-        default="gemini-2.0-flash",
-        description="The name of the language model to use for routing graph nodes.",
-    )
-
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None

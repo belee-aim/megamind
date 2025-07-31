@@ -7,11 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph.state import CompiledStateGraph
 
+from megamind import prompts
+from megamind.clients.frappe_client import FrappeClient
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.admin_support_graph import build_admin_support_graph
 from megamind.graph.workflows.bank_reconciliation_graph import (
@@ -43,6 +45,8 @@ async def lifespan(app: FastAPI):
         bank_reconciliation_graph = await build_bank_reconciliation_graph(
             checkpointer=checkpointer
         )
+
+        app.state.checkpointer = checkpointer
 
         app.state.stock_movement_graph = stock_movement_graph
         app.state.document_graph = document_graph
@@ -105,14 +109,31 @@ async def stream(
 
         # build the graph
         graph: CompiledStateGraph = request.app.state.document_graph
+        checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
+
+        config = RunnableConfig(configurable={"thread_id": sid})
+
+        # Check if the thread already exists
+        thread_state = await checkpointer.aget(config)
+
+        messages = []
+        if thread_state is None:
+            # Fetch team ids of the user
+            frappe_client = FrappeClient(cookie=cookie)
+            teams = frappe_client.get_teams()
+            team_ids = [team.get("name") for team in teams.values()]
+
+            system_prompt = prompts.rag_node_instructions.format(team_ids=team_ids)
+            messages.append(SystemMessage(content=system_prompt))
+
+        # Always add the HumanMessage
+        messages.append(HumanMessage(content=request_data.question))
 
         # Invoke the graph to get the final state
         inputs = {
-            "messages": [HumanMessage(content=request_data.question)],
+            "messages": messages,
             "cookie": cookie,
-            "next_node": request_data.direct_route,
         }
-        config = RunnableConfig(configurable={"thread_id": sid})
 
         async def stream_response():
             try:
@@ -171,7 +192,6 @@ async def stock_movement(
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
-            "next_node": request_data.direct_route,
             "company": request_data.company,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
@@ -233,7 +253,6 @@ async def admin_support(
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
-            "next_node": request_data.direct_route,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
 
@@ -294,7 +313,6 @@ async def bank_reconciliation(
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
-            "next_node": request_data.direct_route,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
 
@@ -303,7 +321,7 @@ async def bank_reconciliation(
                 async for chunk, _ in graph.astream(
                     inputs, config, stream_mode="messages"
                 ):
-                    
+
                     if isinstance(chunk, AIMessage) and chunk.content:
                         event_str = "event: stream_event\n"
                         for line in str(chunk.content).splitlines():

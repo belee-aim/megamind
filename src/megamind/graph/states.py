@@ -6,12 +6,10 @@ from langchain_core.messages.utils import AnyMessage
 
 class AgentState(TypedDict):
     messages: Annotated[List[AnyMessage], add_messages]
-    team_ids: List[str]
-    documents: List[Document]
     cookie: str | None
     recent_search_results: List[dict] | None
     next_node: Literal["rag_node", "agent_node", "stock_movement_agent_node"] | None
-    
+
     # Enhanced stock movement agent state fields
     validation_context: Dict[str, Any] | None
     workflow_state: Dict[str, Any] | None
@@ -23,31 +21,32 @@ class StockMovementState(TypedDict):
     Enhanced state specifically for stock movement operations.
     Includes all the enhanced features from the improvement plan.
     """
+
     # Core state fields
     messages: Annotated[List[AnyMessage], add_messages]
     company: str
     last_stock_entry_id: str | None
-    
+
     # Enhanced search and validation
     recent_search_results: List[Dict[str, Any]] | None
     validation_context: Dict[str, Any] | None
     search_metadata: Dict[str, Any] | None
-    
+
     # Workflow and permissions
     workflow_state: Dict[str, Any] | None
     field_permissions: Dict[str, Any] | None
     document_status: Dict[str, Any] | None
-    
+
     # Performance and analytics
     performance_metrics: Dict[str, Any] | None
     analytics_context: Dict[str, Any] | None
     cache_info: Dict[str, Any] | None
-    
+
     # User experience enhancements
     contextual_help: Dict[str, Any] | None
     error_context: Dict[str, Any] | None
     suggestions: List[Dict[str, Any]] | None
-    
+
     # Business intelligence
     transfer_patterns: List[Dict[str, Any]] | None
     predictive_insights: Dict[str, Any] | None

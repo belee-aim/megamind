@@ -4,9 +4,7 @@ from typing import Annotated
 from loguru import logger
 from pydantic import BaseModel, Field
 from megamind.clients.frappe_client import FrappeClient
-from langchain_core.tools import tool, ToolException, InjectedToolCallId
-from langchain_core.messages import ToolMessage
-from langgraph.types import Command
+from langchain_core.tools import tool, ToolException
 from langgraph.prebuilt import InjectedState
 from megamind.graph.states import AgentState
 from megamind.utils.parser import Parser
@@ -18,14 +16,13 @@ class FrappeRetrieverSchema(BaseModel):
     """
 
     state: Annotated[AgentState, InjectedState]
-    tool_call_id: Annotated[str, InjectedToolCallId]
     team_ids: list[str] = Field(
         description="List of team IDs to retrieve documents from Frappe Drive."
     )
 
 
 @tool(args_schema=FrappeRetrieverSchema)
-def frappe_retriever(state, tool_call_id, team_ids):
+def frappe_retriever(state, team_ids):
     logger.debug("---FRAPPE RETRIEVER TOOL---")
 
     try:
@@ -67,13 +64,4 @@ def frappe_retriever(state, tool_call_id, team_ids):
     except Exception as e:
         raise ToolException(f"Failed to retrieve documents from Frappe Drive: {e}")
 
-    return Command(
-        update={
-            "documents": documents,
-            "messages": [
-                ToolMessage(
-                    "Retrieved documents from Frappe Drive.", tool_call_id=tool_call_id
-                )
-            ],
-        }
-    )
+    return documents
