@@ -3,6 +3,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from megamind.utils.config import settings
 
 
+# TODO: Frappe client initialization should receive a cookie or token for authentication
 class ClientManager:
     def __init__(self):
         self._client: Optional[MultiServerMCPClient] = None

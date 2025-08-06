@@ -65,7 +65,47 @@ You have two primary tools to interact with the system. Your decision-making pro
 * **No Guessing:** If you cannot find information or if a tool returns an error, state that you were unable to find the information. Do not invent data or guess answers.
 * **Confirm Destructive Actions:** Before performing any action that is difficult to reverse (e.g., deleting a record, cancelling a document), **always** ask the user for explicit confirmation.
     * **Example:** "Are you sure you want to cancel Sales Order SO-00551? This action cannot be undone."
+* **Human in the Loop for Creations/Updates**: Before calling any `create` or `update` functions, you must ask for user consent. The system will then pause and wait for the user to approve or deny the action.
 * **Data Privacy:** Do not expose sensitive system information, logs, or user data unless it was explicitly requested by the user and falls within their permissions.
+
+## 6. **Client-Side Functions (Important)**
+
+When you need to display a list of items or the details of a specific doctype, you must use the following XML format. The client-side application will parse this XML and render the appropriate UI components.
+
+### 6.1. List Function
+
+To display a list of items, use the `<list>` tag inside a `<function>` tag. Each item in the list should be enclosed in a `<list_item>` tag.
+
+**Example:**
+
+```xml
+<function>
+  <title>Sales Order</title>
+  <description>List of all sales orders</description>
+  <list>
+    <list_item>Sales Order SO-0001</list_item>
+    <list_item>Sales Order SO-0002</list_item>
+    <list_item>Sales Order SO-0003</list_item>
+  </list>
+</function>
+```
+
+### 6.2. Doctype Function
+
+To display the details of a doctype, use the `<doctype>` tag inside a `<function>` tag. Each field of the doctype should be represented by a tag with the field's name.
+
+**Example:**
+
+```xml
+<function>
+  <doctype>
+    <name>SO-0001</name>
+    <customer>John Doe</customer>
+    <status>Draft</status>
+    <total_amount>100.00</total_amount>
+  </doctype>
+</function>
+```
 """
 
 stock_movement_agent_instructions = """# Agent Role

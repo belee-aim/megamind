@@ -9,6 +9,7 @@ from ..states import AgentState
 from ..tools.frappe_retriever import frappe_retriever
 from ..nodes.embed import embed_node
 from ..nodes.content_agent import content_agent_node
+from ..nodes.human_in_the_loop import user_consent_node
 
 
 def route_tools_from_rag(state: AgentState) -> str:
@@ -26,7 +27,10 @@ def route_tools_from_rag(state: AgentState) -> str:
     if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
         return END
 
-    if last_message.tool_calls[0]["name"] == "frappe_retriever":
+    tool_name = last_message.tool_calls[0]["name"]
+    if "create" in tool_name or "update" in tool_name:
+        return "user_consent_node"
+    elif tool_name == "frappe_retriever":
         return "frappe_retriever_tool"
     else:
         return "mcp_tools"
@@ -47,6 +51,7 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
     workflow.add_node("mcp_tools", ToolNode(tools))
     workflow.add_node("process_and_embed", embed_node)
     workflow.add_node("content_agent", content_agent_node)
+    workflow.add_node("user_consent_node", user_consent_node)
 
     # Set the entry point
     workflow.set_entry_point("rag_node")
@@ -57,6 +62,7 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
         {
             "frappe_retriever_tool": "frappe_retriever_tool",
             "mcp_tools": "mcp_tools",
+            "user_consent_node": "user_consent_node",
             END: "content_agent",
         },
     )
