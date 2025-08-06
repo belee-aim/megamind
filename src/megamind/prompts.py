@@ -80,13 +80,15 @@ To display a list of items, use the `<list>` tag inside a `<function>` tag. Each
 
 ```xml
 <function>
-  <title>Sales Order</title>
-  <description>List of all sales orders</description>
-  <list>
-    <list_item>Sales Order SO-0001</list_item>
-    <list_item>Sales Order SO-0002</list_item>
-    <list_item>Sales Order SO-0003</list_item>
-  </list>
+  <render_list>
+    <title>Sales Order</title>
+    <description>List of all sales orders</description>
+    <list>
+      <list_item>Sales Order SO-0001</list_item>
+      <list_item>Sales Order SO-0002</list_item>
+      <list_item>Sales Order SO-0003</list_item>
+    </list>
+  </render_list>
 </function>
 ```
 
