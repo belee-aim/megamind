@@ -1,7 +1,10 @@
-from typing import Literal
+from typing import Literal, Dict, Any, Optional
 from pydantic import BaseModel
+
+from megamind.graph.schemas import InterruptResponse
 
 
 class ChatRequest(BaseModel):
-    question: str
-    company: str | None = None
+    question: Optional[str] = None
+    company: Optional[str] = None
+    interrupt_response: Optional[InterruptResponse] = None

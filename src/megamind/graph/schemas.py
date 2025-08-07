@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Dict, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -15,4 +15,18 @@ class ConversationSummary(BaseModel):
     )
     structured_data: dict = Field(
         description="Any structured data that was extracted from the conversation, such as form data or API call arguments."
+    )
+
+
+class InterruptResponse(BaseModel):
+    """
+    Interrupt response format
+    """
+
+    type: Literal["accept", "edit", "response", "deny"] = Field(
+        description="A type of user response based on the interrupt"
+    )
+
+    args: Optional[Dict[str, Any] | str] = Field(
+        description="User response data", default=None
     )

@@ -7,8 +7,7 @@ from langchain_core.messages.utils import AnyMessage
 class AgentState(TypedDict):
     messages: Annotated[List[AnyMessage], add_messages]
     cookie: str | None
-    recent_search_results: List[dict] | None
-    next_node: Literal["rag_node", "agent_node", "stock_movement_agent_node"] | None
+    user_consent_response: str | None
 
     # Enhanced stock movement agent state fields
     validation_context: Dict[str, Any] | None

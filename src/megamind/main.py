@@ -10,6 +10,7 @@ from loguru import logger
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
 
 from megamind import prompts
@@ -104,36 +105,32 @@ async def stream(
     """
 
     try:
-        # Extract the cookie from the request
-        cookie = request.headers.get("cookie")
-
-        # build the graph
         graph: CompiledStateGraph = request.app.state.document_graph
-        checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
-
         config = RunnableConfig(configurable={"thread_id": sid})
 
-        # Check if the thread already exists
-        thread_state = await checkpointer.aget(config)
+        inputs = None
+        if request_data.interrupt_response:
+            # This is a continuation of a paused graph
+            inputs = Command(resume=request_data.interrupt_response.model_dump())
+        else:
+            # This is a new message
+            cookie = request.headers.get("cookie")
+            checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
+            thread_state = await checkpointer.aget(config)
 
-        messages = []
-        if thread_state is None:
-            # Fetch team ids of the user
-            frappe_client = FrappeClient(cookie=cookie)
-            teams = frappe_client.get_teams()
-            team_ids = [team.get("name") for team in teams.values()]
+            messages = []
+            if thread_state is None:
+                # New thread, add system prompt
+                frappe_client = FrappeClient(cookie=cookie)
+                teams = frappe_client.get_teams()
+                team_ids = [team.get("name") for team in teams.values()]
+                system_prompt = prompts.rag_node_instructions.format(team_ids=team_ids)
+                messages.append(SystemMessage(content=system_prompt))
 
-            system_prompt = prompts.rag_node_instructions.format(team_ids=team_ids)
-            messages.append(SystemMessage(content=system_prompt))
+            if request_data.question:
+                messages.append(HumanMessage(content=request_data.question))
 
-        # Always add the HumanMessage
-        messages.append(HumanMessage(content=request_data.question))
-
-        # Invoke the graph to get the final state
-        inputs = {
-            "messages": messages,
-            "cookie": cookie,
-        }
+            inputs = {"messages": messages, "cookie": cookie}
 
         async def stream_response():
             try:

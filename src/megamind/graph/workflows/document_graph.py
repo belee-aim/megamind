@@ -28,12 +28,22 @@ def route_tools_from_rag(state: AgentState) -> str:
         return END
 
     tool_name = last_message.tool_calls[0]["name"]
-    if "create" in tool_name or "update" in tool_name:
+    if "create" in tool_name or "update" in tool_name or "delete" in tool_name:
         return "user_consent_node"
     elif tool_name == "frappe_retriever":
         return "frappe_retriever_tool"
     else:
         return "mcp_tools"
+
+
+def after_consent(state: AgentState) -> str:
+    """
+    Routes to the next node based on the user's consent.
+    """
+    if state.get("user_consent_response") == "approved":
+        return "mcp_tools"
+    else:
+        return "rag_node"
 
 
 async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
@@ -64,6 +74,16 @@ async def build_rag_graph(checkpointer: AsyncPostgresSaver = None):
             "mcp_tools": "mcp_tools",
             "user_consent_node": "user_consent_node",
             END: "content_agent",
+        },
+    )
+
+    # Add edges
+    workflow.add_conditional_edges(
+        "user_consent_node",
+        after_consent,
+        {
+            "mcp_tools": "mcp_tools",
+            "rag_node": "rag_node",
         },
     )
 
