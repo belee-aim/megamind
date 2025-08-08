@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     supabase_connection_string: str
     log_level: str = "INFO"
     json_logs: bool = False
-    erpnext_mcp_url: str
     llama_cloud_api_key: str
     frappe_mcp_server_path: str = "/app/frappe_mcp_server/build/index.js"
 
