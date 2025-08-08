@@ -36,7 +36,10 @@ async def lifespan(app: FastAPI):
         settings.supabase_connection_string
     ) as checkpointer:
         # First time execution will create the necessary tables
-        # await checkpointer.setup()
+        try:
+            await checkpointer.setup()
+        except Exception as e:
+            logger.info(f"Could not set up tables: {e}. Assuming they already exist.")
         stock_movement_graph = await build_stock_movement_graph(
             checkpointer=checkpointer
         )
