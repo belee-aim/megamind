@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-
+import asyncio
 import io
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, File
@@ -98,6 +98,52 @@ def get_sid_from_cookie(request: Request):
     return sid
 
 
+async def stream_response_with_ping(graph, inputs, config):
+    """
+    Streams responses from the graph with a ping mechanism to keep the connection alive.
+    """
+    queue = asyncio.Queue()
+
+    async def stream_producer():
+        try:
+            async for chunk, _ in graph.astream(inputs, config, stream_mode="messages"):
+                if isinstance(chunk, AIMessage) and chunk.content:
+                    await queue.put(chunk.content)
+        except Exception as e:
+            logger.error(f"Error in stream producer: {e}")
+            await queue.put(f"Error: {e}")
+        finally:
+            await queue.put(None)  # Signal completion
+
+    async def response_generator():
+        producer_task = asyncio.create_task(stream_producer())
+        while True:
+            try:
+                chunk = await asyncio.wait_for(queue.get(), timeout=2.0)
+                if chunk is None:
+                    yield "event: done\ndata: {}\n\n".encode("utf-8")
+                    break
+                event_str = "event: stream_event\n"
+                for line in str(chunk).splitlines():
+                    data_str = f"data: {line}\n"
+                    yield (event_str + data_str).encode("utf-8")
+                yield b"\n"
+            except asyncio.TimeoutError:
+                yield "event: ping\ndata: {}\n\n".encode("utf-8")
+            except Exception as e:
+                logger.error(f"Error in response generator: {e}")
+                import json
+
+                error_data = {"message": "An error occurred during the stream."}
+                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
+                    "utf-8"
+                )
+                break
+        await producer_task
+
+    return StreamingResponse(response_generator(), media_type="text/event-stream")
+
+
 @app.post("/api/v1/stream")
 async def stream(
     request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
@@ -106,24 +152,20 @@ async def stream(
     Endpoint to chat with AI models.
     Streams the response from the AI model.
     """
-
     try:
         graph: CompiledStateGraph = request.app.state.document_graph
         config = RunnableConfig(configurable={"thread_id": sid})
 
         inputs = None
         if request_data.interrupt_response:
-            # This is a continuation of a paused graph
             inputs = Command(resume=request_data.interrupt_response.model_dump())
         else:
-            # This is a new message
             cookie = request.headers.get("cookie")
             checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
             thread_state = await checkpointer.aget(config)
 
             messages = []
             if thread_state is None:
-                # New thread, add system prompt
                 frappe_client = FrappeClient(cookie=cookie)
                 teams = frappe_client.get_teams()
                 team_ids = [team.get("name") for team in teams.values()]
@@ -135,32 +177,7 @@ async def stream(
 
             inputs = {"messages": messages, "cookie": cookie}
 
-        async def stream_response():
-            try:
-                async for chunk, _ in graph.astream(
-                    inputs, config, stream_mode="messages"
-                ):
-                    if isinstance(chunk, AIMessage) and chunk.content:
-                        event_str = "event: stream_event\n"
-                        for line in str(chunk.content).splitlines():
-                            data_str = f"data: {line}\n"
-                            yield (event_str + data_str).encode("utf-8")
-                        yield b"\n"
-
-                # Signal the end of the stream to the client
-                yield "event: done\ndata: {}\n\n".encode("utf-8")
-
-            except Exception as e:
-                logger.error(f"Error during SSE stream generation: {e}")
-                # Send an error event to the client before closing
-                import json
-
-                error_data = {"message": "An error occurred during the stream."}
-                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
-                    "utf-8"
-                )
-
-        return StreamingResponse(stream_response(), media_type="text/event-stream")
+        return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
         logger.error(f"Unexpected error in chat endpoint: {e}")
@@ -180,48 +197,16 @@ async def stock_movement(
     Endpoint to chat with Stock movement AI Agent.
     Streams the response from the AI model.
     """
-
     try:
-        # Extract the cookie from the request
         cookie = request.headers.get("cookie")
-
-        # build the graph
         graph: CompiledStateGraph = request.app.state.stock_movement_graph
-
-        # Invoke the graph to get the final state
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
             "company": request_data.company,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
-
-        async def stream_response():
-            try:
-                async for chunk, _ in graph.astream(
-                    inputs, config, stream_mode="messages"
-                ):
-                    if isinstance(chunk, AIMessage) and chunk.content:
-                        event_str = "event: stream_event\n"
-                        for line in str(chunk.content).splitlines():
-                            data_str = f"data: {line}\n"
-                            yield (event_str + data_str).encode("utf-8")
-                        yield b"\n"
-
-                # Signal the end of the stream to the client
-                yield "event: done\ndata: {}\n\n".encode("utf-8")
-
-            except Exception as e:
-                logger.error(f"Error during SSE stream generation: {e}")
-                # Send an error event to the client before closing
-                import json
-
-                error_data = {"message": "An error occurred during the stream."}
-                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
-                    "utf-8"
-                )
-
-        return StreamingResponse(stream_response(), media_type="text/event-stream")
+        return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
         logger.error(f"Unexpected error in chat endpoint: {e}")
@@ -241,47 +226,15 @@ async def admin_support(
     Endpoint to chat with Admin Support AI Agent.
     Streams the response from the AI model.
     """
-
     try:
-        # Extract the cookie from the request
         cookie = request.headers.get("cookie")
-
-        # build the graph
         graph: CompiledStateGraph = request.app.state.admin_support_graph
-
-        # Invoke the graph to get the final state
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
-
-        async def stream_response():
-            try:
-                async for chunk, _ in graph.astream(
-                    inputs, config, stream_mode="messages"
-                ):
-                    if isinstance(chunk, AIMessage) and chunk.content:
-                        event_str = "event: stream_event\n"
-                        for line in str(chunk.content).splitlines():
-                            data_str = f"data: {line}\n"
-                            yield (event_str + data_str).encode("utf-8")
-                        yield b"\n"
-
-                # Signal the end of the stream to the client
-                yield "event: done\ndata: {}\n\n".encode("utf-8")
-
-            except Exception as e:
-                logger.error(f"Error during SSE stream generation: {e}")
-                # Send an error event to the client before closing
-                import json
-
-                error_data = {"message": "An error occurred during the stream."}
-                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
-                    "utf-8"
-                )
-
-        return StreamingResponse(stream_response(), media_type="text/event-stream")
+        return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
         logger.error(f"Unexpected error in chat endpoint: {e}")
@@ -301,48 +254,15 @@ async def bank_reconciliation(
     Endpoint to chat with Bank Reconciliation AI Agent.
     Streams the response from the AI model.
     """
-
     try:
-        # Extract the cookie from the request
         cookie = request.headers.get("cookie")
-
-        # build the graph
         graph: CompiledStateGraph = request.app.state.bank_reconciliation_graph
-
-        # Invoke the graph to get the final state
         inputs = {
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
         }
         config = RunnableConfig(configurable={"thread_id": sid})
-
-        async def stream_response():
-            try:
-                async for chunk, _ in graph.astream(
-                    inputs, config, stream_mode="messages"
-                ):
-
-                    if isinstance(chunk, AIMessage) and chunk.content:
-                        event_str = "event: stream_event\n"
-                        for line in str(chunk.content).splitlines():
-                            data_str = f"data: {line}\n"
-                            yield (event_str + data_str).encode("utf-8")
-                        yield b"\n"
-
-                # Signal the end of the stream to the client
-                yield "event: done\ndata: {}\n\n".encode("utf-8")
-
-            except Exception as e:
-                logger.error(f"Error during SSE stream generation: {e}")
-                # Send an error event to the client before closing
-                import json
-
-                error_data = {"message": "An error occurred during the stream."}
-                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
-                    "utf-8"
-                )
-
-        return StreamingResponse(stream_response(), media_type="text/event-stream")
+        return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
         logger.error(f"Unexpected error in chat endpoint: {e}")
