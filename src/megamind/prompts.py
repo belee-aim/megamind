@@ -99,7 +99,9 @@ To display a list of items, use the `<list>` tag inside a `<function>` tag. Each
 
 ### 6.2. Doctype Function
 
-To display the details of a doctype, use the `<doctype>` tag inside a `<function>` tag. Each field of the doctype should be represented by a tag with the field's name.
+Use the `<doctype>` tag to display **partial, static information** that you have already retrieved. Each field of the doctype should be represented by a tag with the field's name.
+
+**Note:** This function should only be used for displaying partial information. For displaying full details, please use the `doc_item` function.
 
 **Example:**
 
@@ -110,6 +112,19 @@ To display the details of a doctype, use the `<doctype>` tag inside a `<function
     <status>Draft</status>
     <total_amount>100.00</total_amount>
   </doctype>
+</function>
+
+### 6.3. Doc Item Function
+
+Use the `<doc_item>` tag to display the **full, real-time details** of a document. This function signals the client-side application to fetch and render the complete data for the specified document. This is the preferred method for showing complete information as it ensures the data is always up-to-date.
+
+**Example:**
+
+<function>
+  <doc_item>
+    <doctype>Stock Entry</doctype>
+    <name>MAT-STE-2025-00012</name>
+  </doc_item>
 </function>
 
 ## 7. Few-Shot Examples
