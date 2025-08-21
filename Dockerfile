@@ -62,6 +62,7 @@ WORKDIR /app
 # Copy the environment, but not the source code
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /app/frappe_mcp_server /app/frappe_mcp_server
+COPY --from=builder --chown=app:app /app/Frappe_Assistant_Core /app/Frappe_Assistant_Core
 
 
 ENV PATH="/app/.venv/bin:$PATH"
