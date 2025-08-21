@@ -27,7 +27,7 @@ COPY pyproject.toml uv.lock /app/
 COPY src/ /app/src
 # Clone the frappe_mcp_server repository
 RUN --mount=type=ssh,id=default \
-    git clone https://github.com/AIMlink-team/frappe_mcp_server.git /app/frappe_mcp_server
+    git clone git@github.com:AIMlink-team/frappe_mcp_server.git /app/frappe_mcp_server
 
 # Install Node.js and npm
 RUN apt-get update && apt-get install -y nodejs npm
