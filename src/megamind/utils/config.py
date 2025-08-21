@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     json_logs: bool = False
     llama_cloud_api_key: str
-    frappe_mcp_server_path: str = "/app/frappe_mcp_server/build/index.js"
+    frappe_mcp_server_path: str = "none"
+    frappe_assistant_core_server_path: str = "none"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

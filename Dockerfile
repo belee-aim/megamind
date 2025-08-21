@@ -27,7 +27,7 @@ COPY pyproject.toml uv.lock /app/
 COPY src/ /app/src
 # Clone the frappe_mcp_server repository
 RUN --mount=type=ssh,id=default \
-    git clone git@github.com:AIMlink-team/frappe_mcp_server.git /app/frappe_mcp_server
+    git clone https://github.com/AIMlink-team/frappe_mcp_server.git /app/frappe_mcp_server
 
 # Install Node.js and npm
 RUN apt-get update && apt-get install -y nodejs npm
@@ -38,6 +38,13 @@ RUN cd /app/frappe_mcp_server && npm install && npm run build
 # Sync the project
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
+
+# Clone the frappe_mcp_server repository
+RUN --mount=type=ssh,id=default \
+    git clone https://github.com/buildswithpaul/Frappe_Assistant_Core.git /app/Frappe_Assistant_Core
+
+RUN cd /app/Frappe_Assistant_Core && \
+    pip install -e .
 
 # Final stage
 FROM python:3.12-slim
