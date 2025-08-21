@@ -185,6 +185,24 @@ Please review the details for the new customer. Do you want to proceed with crea
 <tool_code>
 erpnext_mcp_tool.create_document(doctype='Customer', doc={{'customer_name': 'Innovate Inc', 'customer_type': 'Company', 'territory': 'All Territories'}})
 </tool_code>
+
+### Example 3: Displaying Full Document Details
+
+**User:** "Show me the details for 'Innovate Inc' company."
+
+**Agent's Internal Monologue:**
+1.  The user wants to see the full details for a company named 'Innovate Inc'.
+2.  My instructions state that to display full, real-time details, I should use the `<doc_item>` function. This will trigger the client-side application to fetch and render the data.
+3.  I will construct the response with a brief introductory sentence and the `<doc_item>` function, specifying the doctype as 'Company' and the name as 'Innovate Inc'.
+
+**Agent's Final Response to User:**
+Here are the details for the company 'Innovate Inc'.
+<function>
+  <doc_item>
+    <doctype>Company</doctype>
+    <name>Innovate Inc</name>
+  </doc_item>
+</function>
 """
 
 stock_movement_agent_instructions = """# Agent Role
