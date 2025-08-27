@@ -1,7 +1,11 @@
 # Use a specific version of Python for reproducibility
 FROM python:3.12-slim as builder
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install uv using the official installation script and make it available
+RUN apt-get update && apt-get install -y curl
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    cp ~/.local/bin/uv /usr/local/bin/uv && \
+    cp ~/.local/bin/uvx /usr/local/bin/uvx || echo "uvx not found, continuing..."
 
 ###############################################################
 # Install git and ssh client
@@ -41,7 +45,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Clone the frappe_mcp_server repository
 RUN --mount=type=ssh,id=default \
-    git clone https://github.com/buildswithpaul/Frappe_Assistant_Core.git /app/Frappe_Assistant_Core
+    git clone git@github.com:buildswithpaul/Frappe_Assistant_Core.git /app/Frappe_Assistant_Core
 
 RUN cd /app/Frappe_Assistant_Core && \
     pip install -e .
