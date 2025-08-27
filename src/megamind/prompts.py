@@ -203,6 +203,70 @@ Here are the details for the company 'Innovate Inc'.
     <name>Innovate Inc</name>
   </doc_item>
 </function>
+
+### Example 4: Handling Workflow State Change
+
+**User:** "Change the status of Sales Order SO-00123 to 'To Deliver and Bill'."
+
+**Agent's Internal Monologue:**
+1.  The user wants to change the workflow state of a Sales Order.
+2.  First, I need to check the available workflow actions for this document. I will use the `get_workflow_state` tool.
+3.  *Tool returns available transitions: `['To Deliver and Bill', 'Cancelled']`.*
+4.  The requested state 'To Deliver and Bill' is a valid transition.
+5.  My instructions require me to ask for confirmation before applying a workflow change.
+6.  I will construct the `apply_workflow` tool call.
+7.  I will also construct the user-facing content, which includes a confirmation question.
+8.  I will output these two parts in a single `AIMessage`.
+
+**Agent's Final Response to User (This is a single AIMessage containing the user-facing text and the tool_call):**
+
+Are you sure you want to change the status of Sales Order SO-00123 to 'To Deliver and Bill'?
+<function>
+  <doctype>
+    <name>SO-00123</name>
+    <status>To Deliver and Bill</status>
+  </doctype>
+  <expected_human_response>
+    <type>accept</type>
+    <type>deny</type>
+  </expected_human_response>
+</function>
+
+<tool_code>
+erpnext_mcp_tool.apply_workflow(doctype='Sales Order', name='SO-00123', action='To Deliver and Bill')
+</tool_code>
+
+### Example 5: Handling "Next State" Workflow Change
+
+**User:** "Move Sales Order SO-00123 to the next stage."
+
+**Agent's Internal Monologue:**
+1.  The user wants to advance the workflow for Sales Order SO-00123 but hasn't specified the next state.
+2.  I need to determine the current state and the available transitions. I will use the `get_workflow_state` tool.
+3.  *Tool returns current state as 'Draft' and available transitions: `['Submit', 'Cancel']`.*
+4.  The most logical "next stage" from 'Draft' is 'Submit'.
+5.  My instructions require me to ask for confirmation before applying a workflow change.
+6.  I will construct the `apply_workflow` tool call with the action 'Submit'.
+7.  I will also construct the user-facing content, which includes a confirmation question specifying the action.
+8.  I will output these two parts in a single `AIMessage`.
+
+**Agent's Final Response to User (This is a single AIMessage containing the user-facing text and the tool_call):**
+
+The next stage for Sales Order SO-00123 is 'Submit'. Are you sure you want to proceed?
+<function>
+  <doctype>
+    <name>SO-00123</name>
+    <status>Submit</status>
+  </doctype>
+  <expected_human_response>
+    <type>accept</type>
+    <type>deny</type>
+  </expected_human_response>
+</function>
+
+<tool_code>
+erpnext_mcp_tool.apply_workflow(doctype='Sales Order', name='SO-00123', action='Submit')
+</tool_code>
 """
 
 stock_movement_agent_instructions = """# Agent Role

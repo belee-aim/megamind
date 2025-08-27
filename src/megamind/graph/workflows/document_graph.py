@@ -11,6 +11,13 @@ from ..nodes.embed import embed_node
 from ..nodes.content_agent import content_agent_node
 from ..nodes.human_in_the_loop import user_consent_node
 
+interrupt_keywords = [
+    "create",
+    "update",
+    "delete",
+    "apply_workflow",
+]
+
 
 def route_tools_from_rag(state: AgentState) -> str:
     """
@@ -28,7 +35,7 @@ def route_tools_from_rag(state: AgentState) -> str:
         return END
 
     tool_name = last_message.tool_calls[0]["name"]
-    if "create" in tool_name or "update" in tool_name or "delete" in tool_name:
+    if any(keyword in tool_name.lower() for keyword in interrupt_keywords):
         return "user_consent_node"
     elif tool_name == "frappe_retriever":
         return "frappe_retriever_tool"
