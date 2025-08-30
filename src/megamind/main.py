@@ -144,17 +144,23 @@ async def stream_response_with_ping(graph, inputs, config):
     return StreamingResponse(response_generator(), media_type="text/event-stream")
 
 
-@app.post("/api/v1/stream")
+@app.post("/api/v1/stream/{thread}")
 async def stream(
-    request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
+    request: Request,
+    request_data: ChatRequest,
+    thread: str = None,
 ):
     """
     Endpoint to chat with AI models.
     Streams the response from the AI model.
     """
+
+    if not thread:
+        raise HTTPException(status_code=400, detail="Thread parameter is required")
+
     try:
         graph: CompiledStateGraph = request.app.state.document_graph
-        config = RunnableConfig(configurable={"thread_id": sid})
+        config = RunnableConfig(configurable={"thread_id": thread})
 
         inputs = None
         if request_data.interrupt_response:
@@ -189,14 +195,20 @@ async def stream(
         )
 
 
-@app.post("/api/v1/stock-movement/stream")
+@app.post("/api/v1/stock-movement/stream/{thread}")
 async def stock_movement(
-    request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
+    request: Request,
+    request_data: ChatRequest,
+    thread: str = None,
 ):
     """
     Endpoint to chat with Stock movement AI Agent.
     Streams the response from the AI model.
     """
+
+    if not thread:
+        raise HTTPException(status_code=400, detail="Thread parameter is required")
+
     try:
         cookie = request.headers.get("cookie")
         graph: CompiledStateGraph = request.app.state.stock_movement_graph
@@ -205,7 +217,7 @@ async def stock_movement(
             "cookie": cookie,
             "company": request_data.company,
         }
-        config = RunnableConfig(configurable={"thread_id": sid})
+        config = RunnableConfig(configurable={"thread_id": thread})
         return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
@@ -218,14 +230,20 @@ async def stock_movement(
         )
 
 
-@app.post("/api/v1/admin-support/stream")
+@app.post("/api/v1/admin-support/stream/{thread}")
 async def admin_support(
-    request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
+    request: Request,
+    request_data: ChatRequest,
+    thread: str = None,
 ):
     """
     Endpoint to chat with Admin Support AI Agent.
     Streams the response from the AI model.
     """
+
+    if not thread:
+        raise HTTPException(status_code=400, detail="Thread parameter is required")
+
     try:
         cookie = request.headers.get("cookie")
         graph: CompiledStateGraph = request.app.state.admin_support_graph
@@ -233,7 +251,7 @@ async def admin_support(
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
         }
-        config = RunnableConfig(configurable={"thread_id": sid})
+        config = RunnableConfig(configurable={"thread_id": thread})
         return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
@@ -246,14 +264,20 @@ async def admin_support(
         )
 
 
-@app.post("/api/v1/bank-reconciliation/stream")
+@app.post("/api/v1/bank-reconciliation/stream/{thread}")
 async def bank_reconciliation(
-    request: Request, request_data: ChatRequest, sid=Depends(get_sid_from_cookie)
+    request: Request,
+    request_data: ChatRequest,
+    thread: str = None,
 ):
     """
     Endpoint to chat with Bank Reconciliation AI Agent.
     Streams the response from the AI model.
     """
+
+    if not thread:
+        raise HTTPException(status_code=400, detail="Thread parameter is required")
+
     try:
         cookie = request.headers.get("cookie")
         graph: CompiledStateGraph = request.app.state.bank_reconciliation_graph
@@ -261,7 +285,7 @@ async def bank_reconciliation(
             "messages": [HumanMessage(content=request_data.question)],
             "cookie": cookie,
         }
-        config = RunnableConfig(configurable={"thread_id": sid})
+        config = RunnableConfig(configurable={"thread_id": thread})
         return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
