@@ -65,7 +65,8 @@ async def reflect_node(state: RoleGenerationState, config: RunnableConfig):
 
     response = await llm.ainvoke(formatted_prompt)
 
-    return {"feedback": response.content}
+    loop_count = state.get("loop_count", 0) + 1
+    return {"feedback": response.content, "loop_count": loop_count}
 
 
 async def describe_permissions_node(state: RoleGenerationState, config: RunnableConfig):
@@ -80,6 +81,7 @@ async def describe_permissions_node(state: RoleGenerationState, config: Runnable
 
     formatted_prompt = system_prompt.format(
         role_name=state.get("role_name", "User"),
+        generated_roles=state.get("generated_roles", {}).model_dump(),
     )
 
     response = await llm.ainvoke(formatted_prompt)

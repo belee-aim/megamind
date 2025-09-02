@@ -997,4 +997,7 @@ You must return a string that describes the permissions in a human-readable form
 {role_name} will have the following permissions:
 - **Stock Entry**: {role_name} can read, write, create, delete, print, email, and share stock entries.
 - **Warehouse**: {role_name} can read, write, create, delete, print, email, and share warehouses.
+
+Generated roles:
+{generated_roles}
 """

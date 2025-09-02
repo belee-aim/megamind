@@ -16,7 +16,7 @@ def should_continue(state: RoleGenerationState) -> str:
     """
     Determines whether to continue with the reflection loop or end the workflow.
     """
-    if state.get("feedback") == "OK":
+    if state.get("loop_count", 0) >= 3 or state.get("feedback") == "OK":
         return "describe_permissions_node"
     else:
         return "generate_role_node"
