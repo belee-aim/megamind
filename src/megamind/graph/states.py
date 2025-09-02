@@ -50,3 +50,11 @@ class StockMovementState(TypedDict):
     transfer_patterns: List[Dict[str, Any]] | None
     predictive_insights: Dict[str, Any] | None
     optimization_recommendations: List[Dict[str, Any]] | None
+
+
+class RoleGenerationState(TypedDict):
+    messages: Annotated[List[AnyMessage], add_messages]
+    role_name: str
+    user_description: str
+    generated_roles: Dict[str, Any] | None
+    feedback: str | None

@@ -30,3 +30,37 @@ class InterruptResponse(BaseModel):
     args: Optional[Dict[str, Any] | str] = Field(
         description="User response data", default=None
     )
+
+
+class Permission(BaseModel):
+    if_owner: str | None
+    has_if_owner_enabled: bool
+    select: int
+    read: int
+    write: int
+    create: int
+    delete: int
+    submit: int
+    cancel: int
+    amend: int
+    print: int
+    email: int
+    report: int
+    import_perm: int = Field(alias="import")
+    export: int
+    share: int
+
+
+class DoctypePermission(BaseModel):
+    doctype: str
+    permissions: Permission
+
+
+class RoleGenerationResponse(BaseModel):
+    """
+    Response model for role generation requests.
+    """
+
+    roles: list[DoctypePermission] = Field(
+        description="The generated roles based on the user's description."
+    )

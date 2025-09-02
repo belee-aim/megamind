@@ -22,7 +22,11 @@ from megamind.graph.workflows.bank_reconciliation_graph import (
 )
 from megamind.graph.workflows.document_graph import build_rag_graph
 from megamind.graph.workflows.stock_movement_graph import build_stock_movement_graph
-from megamind.models.requests import ChatRequest
+from megamind.graph.workflows.role_generation_graph import (
+    build_role_generation_graph,
+)
+from megamind.models.requests import ChatRequest, RoleGenerationRequest
+from megamind.models.responses import MainResponse
 from megamind.utils.logger import setup_logging
 from megamind.utils.config import settings
 
@@ -49,6 +53,7 @@ async def lifespan(app: FastAPI):
         bank_reconciliation_graph = await build_bank_reconciliation_graph(
             checkpointer=checkpointer
         )
+        role_generation_graph = await build_role_generation_graph()
 
         app.state.checkpointer = checkpointer
 
@@ -56,6 +61,7 @@ async def lifespan(app: FastAPI):
         app.state.document_graph = document_graph
         app.state.admin_support_graph = admin_support_graph
         app.state.bank_reconciliation_graph = bank_reconciliation_graph
+        app.state.role_generation_graph = role_generation_graph
         yield
 
 
@@ -330,3 +336,30 @@ async def merge_api(
 
     # Return top 5 for preview (or convert to JSON)
     return result_df.to_dict(orient="records")
+
+
+@app.post("/api/v1/role-generation")
+async def role_generation(
+    request: Request,
+    request_data: RoleGenerationRequest,
+):
+    """
+    Endpoint to generate role permissions.
+    """
+    try:
+        graph: CompiledStateGraph = request.app.state.role_generation_graph
+        inputs = {
+            "role_name": request_data.role_name,
+            "user_description": request_data.user_description,
+        }
+        final_state = await graph.ainvoke(inputs)
+        return MainResponse(response=final_state["generated_roles"]).model_dump()
+
+    except Exception as e:
+        logger.error(f"Unexpected error in role generation endpoint: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=MainResponse(
+                message="Error", error=f"An unexpected error occurred: {str(e)}"
+            ).model_dump(),
+        )

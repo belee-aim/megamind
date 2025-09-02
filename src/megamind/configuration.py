@@ -14,7 +14,7 @@ class Configuration(BaseModel):
     )
 
     query_generator_model: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
+        default="gemini-2.5-flash",
         description="The name of the language model to use for the agent's query generation.",
     )
 
