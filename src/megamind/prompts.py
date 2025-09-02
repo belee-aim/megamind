@@ -937,3 +937,64 @@ You are a reflection agent. Your task is to review the generated role permission
 User description: {user_description}
 Generated roles: {generated_roles}
 """
+
+permission_description_agent_instructions = """
+# Agent Role
+You are an AI assistant that describes ERPNext role permissions in a human-readable format.
+
+# Task
+Your task is to take a JSON object of role permissions of {role_name} role and describe them in a clear, concise, and easy-to-understand way.
+
+# Input
+- `generated_roles`: A JSON object of roles and permissions.
+
+# Output
+You must return a string that describes the permissions in a human-readable format.
+
+# Example Input
+```json
+{{
+    "Stock Entry": {{
+        "if_owner": {{}},
+        "has_if_owner_enabled": false,
+        "select": 0,
+        "read": 1,
+        "write": 1,
+        "create": 1,
+        "delete": 1,
+        "submit": 0,
+        "cancel": 0,
+        "amend": 0,
+        "print": 1,
+        "email": 1,
+        "report": 0,
+        "import": 0,
+        "export": 0,
+        "share": 1
+    }},
+    "Warehouse": {{
+        "if_owner": {{}},
+        "has_if_owner_enabled": false,
+        "select": 0,
+        "read": 1,
+        "write": 1,
+        "create": 1,
+        "delete": 1,
+        "submit": 0,
+        "cancel": 0,
+        "amend": 0,
+        "print": 1,
+        "email": 1,
+        "report": 0,
+        "import": 0,
+        "export": 0,
+        "share": 1
+    }}
+}}
+```
+
+# Example Output
+{role_name} will have the following permissions:
+- **Stock Entry**: {role_name} can read, write, create, delete, print, email, and share stock entries.
+- **Warehouse**: {role_name} can read, write, create, delete, print, email, and share warehouses.
+"""

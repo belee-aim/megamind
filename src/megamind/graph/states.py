@@ -58,3 +58,4 @@ class RoleGenerationState(TypedDict):
     user_description: str
     generated_roles: Dict[str, Any] | None
     feedback: str | None
+    permission_description: str | None

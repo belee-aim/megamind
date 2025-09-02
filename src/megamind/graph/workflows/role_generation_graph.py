@@ -4,7 +4,11 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from megamind.clients.manager import client_manager
 from megamind.configuration import Configuration
-from megamind.graph.nodes.role_generation_agent import generate_role_node, reflect_node
+from megamind.graph.nodes.role_generation_agent import (
+    generate_role_node,
+    reflect_node,
+    describe_permissions_node,
+)
 from megamind.graph.states import RoleGenerationState
 
 
@@ -13,7 +17,7 @@ def should_continue(state: RoleGenerationState) -> str:
     Determines whether to continue with the reflection loop or end the workflow.
     """
     if state.get("feedback") == "OK":
-        return END
+        return "describe_permissions_node"
     else:
         return "generate_role_node"
 
@@ -31,6 +35,7 @@ async def build_role_generation_graph():
     tools = await mcp_client.get_tools()
     workflow.add_node("mcp_tools", ToolNode(tools))
     workflow.add_node("reflect_node", reflect_node)
+    workflow.add_node("describe_permissions_node", describe_permissions_node)
 
     # Set the entry point
     workflow.set_entry_point("generate_role_node")
@@ -48,9 +53,10 @@ async def build_role_generation_graph():
         should_continue,
         {
             "generate_role_node": "generate_role_node",
-            END: END,
+            "describe_permissions_node": "describe_permissions_node",
         },
     )
+    workflow.add_edge("describe_permissions_node", END)
 
     # Compile the graph
     app = workflow.compile()

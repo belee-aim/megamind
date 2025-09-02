@@ -66,3 +66,22 @@ async def reflect_node(state: RoleGenerationState, config: RunnableConfig):
     response = await llm.ainvoke(formatted_prompt)
 
     return {"feedback": response.content}
+
+
+async def describe_permissions_node(state: RoleGenerationState, config: RunnableConfig):
+    """
+    Describes the generated role permissions in a human-readable format.
+    """
+    logger.debug("---DESCRIBE PERMISSIONS NODE---")
+    configurable = Configuration.from_runnable_config(config)
+    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
+
+    system_prompt = prompts.permission_description_agent_instructions
+
+    formatted_prompt = system_prompt.format(
+        role_name=state.get("role_name", "User"),
+    )
+
+    response = await llm.ainvoke(formatted_prompt)
+
+    return {"permission_description": response.content}

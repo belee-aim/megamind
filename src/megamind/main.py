@@ -353,7 +353,12 @@ async def role_generation(
             "user_description": request_data.user_description,
         }
         final_state = await graph.ainvoke(inputs)
-        return MainResponse(response=final_state["generated_roles"]).model_dump()
+        return MainResponse(
+            response={
+                "roles": final_state.get("generated_roles", "").roles,
+                "description": final_state.get("permission_description", ""),
+            }
+        ).model_dump()
 
     except Exception as e:
         logger.error(f"Unexpected error in role generation endpoint: {e}")
