@@ -26,4 +26,12 @@ async def rag_node(state: AgentState, config: RunnableConfig):
     tools = [frappe_retriever] + mcp_tools
     response = await llm.bind_tools(tools).ainvoke(messages)
 
+    # Add cookie to tool call args if present
+    if response.tool_calls:
+        cookie = state.get("cookie")
+        for tool_call in response.tool_calls:
+            tool_name = tool_call.get("name")
+            if any(tool.name == tool_name for tool in mcp_tools):
+                tool_call["args"]["user_token"] = cookie
+
     return {"messages": [response]}
