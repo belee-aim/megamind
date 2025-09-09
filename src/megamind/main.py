@@ -351,7 +351,9 @@ async def role_generation(
         inputs = {
             "role_name": request_data.role_name,
             "user_description": request_data.user_description,
+            "cookie": request.headers.get("cookie"),
         }
+        logger.debug(f"Role generation inputs: {inputs}")
         final_state = await graph.ainvoke(inputs)
         return MainResponse(
             response={

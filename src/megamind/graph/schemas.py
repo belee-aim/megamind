@@ -64,3 +64,11 @@ class RoleGenerationResponse(BaseModel):
     roles: list[DoctypePermission] = Field(
         description="The generated roles based on the user's description."
     )
+
+
+class RelatedRoleResponse(BaseModel):
+    """
+    Response model for finding a related role.
+    """
+
+    role_name: str = Field(description="The name of the related role.")

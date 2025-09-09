@@ -53,10 +53,11 @@ class StockMovementState(TypedDict):
 
 
 class RoleGenerationState(TypedDict):
-    messages: Annotated[List[AnyMessage], add_messages]
+    cookie: str
     role_name: str
     user_description: str
     generated_roles: Dict[str, Any] | None
-    feedback: str | None
     permission_description: str | None
-    loop_count: int = 0
+    existing_roles: list[str] | None
+    related_role: str | None
+    related_role_permissions: Dict[str, Any] | None

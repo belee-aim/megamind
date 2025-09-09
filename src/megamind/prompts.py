@@ -848,39 +848,126 @@ Based on the following conversation, please extract the following information an
 Conversation:
 {conversation}"""
 
-role_generation_agent_instructions = """
+find_related_role_instructions = """
 # Agent Role
-You are an AI assistant that generates ERPNext role permissions based on a user's description.
+You are an AI assistant that finds a related role based on a user's description.
 
 # Task
-Your task is to analyze the user's description of a role and determine the appropriate DocTypes and permissions the role should have.
+Your task is to analyze the user's description, role name and determine which of the existing roles is most similar.
+
+# Input
+- `role_name`: The name of the role to be created.
+- `user_description`: The description of the user's defined role's responsibilities.
+- `existing_roles`: Existing roles in the system.
+
+`role_name`: {role_name}
+`user_description`: {user_description}
+`existing_roles`: {existing_roles}
+
+# Output
+You must return a JSON object with a single key, "role_name". The value of this key should be the name of the single most similar role.
+
+# Example
+Role name: Warehouse Manager
+User Description: "This user will be responsible for managing stock entries and warehouses."
+Existing Roles: ["Sales Manager", "Stock Manager", "HR Manager"]
+Output:
+```json
+{{
+  "role_name": "Stock Manager"
+}}
+```
+"""
+
+role_generation_agent_instructions = """
+# Agent Role
+You are an AI assistant that generates ERPNext role permissions based on a user's description, using a related role's permissions as a reference.
+
+# Task
+Your task is to analyze the user's description of a role and the permissions of a related role, and then determine the appropriate DocTypes and permissions the new role should have.
 
 # Input
 - `role_name`: The name of the role to be created.
 - `user_description`: A natural language description of the role's responsibilities.
+- `related_role`: The name of an existing role that is similar to the one being created.
+- `related_role_permissions`: The permissions of the related role.
 
-# Tool Usage
-Before generating the role, you **must** use the `erpnext_mcp_tool` to look up existing roles and permissions. This will help you to:
-- Understand the existing permission scheme.
-- Ensure that the generated role is consistent with the existing system configuration.
+`role_name`: {role_name}
+`user_description`: {user_description}
+`related_role`: {related_role}
+`related_role_permissions`: {related_role_permissions}
 
 # Output
 You must return a JSON object with a single key, "roles". The value of this key should be a list of objects, where each object represents a DocType and its associated permissions.
 
+# Example
+Role Name: "Junior Stock Manager"
+User Description: "This user will be responsible for managing stock entries, but should not be able to delete them."
+Related Role: "Stock Manager"
+Related Role Permissions:
+```json
+{{
+  "roles": [
+    {{
+      "doctype": "Stock Entry",
+      "permissions": {{
+        "if_owner": null,
+        "has_if_owner_enabled": false,
+        "select": 0,
+        "read": 1,
+        "write": 1,
+        "create": 1,
+        "delete": 1,
+        "submit": 0,
+        "cancel": 0,
+        "amend": 0,
+        "print": 1,
+        "email": 1,
+        "report": 0,
+        "import": 0,
+        "export": 0,
+        "share": 1
+      }}
+    }},
+    {{
+      "doctype": "Warehouse",
+      "permissions": {{
+        "if_owner": null,
+        "has_if_owner_enabled": false,
+        "select": 0,
+        "read": 1,
+        "write": 1,
+        "create": 1,
+        "delete": 1,
+        "submit": 0,
+        "cancel": 0,
+        "amend": 0,
+        "print": 1,
+        "email": 1,
+        "report": 0,
+        "import": 0,
+        "export": 0,
+        "share": 1
+      }}
+    }}
+  ]
+}}
+```
+
 # Example Output
 ```json
-{
+{{
   "roles": [
-    {
+    {{
       "doctype": "Stock Entry",
-      "permissions": {
+      "permissions": {{
         "if_owner": null,
         "has_if_owner_enabled": false,
         "select": 0,
         "read": 1,
         "write": 1,
         "create": 1,
-        "delete": 1,
+        "delete": 0,
         "submit": 0,
         "cancel": 0,
         "amend": 0,
@@ -890,11 +977,11 @@ You must return a JSON object with a single key, "roles". The value of this key 
         "import": 0,
         "export": 0,
         "share": 1
-      }
-    },
-    {
+      }}
+    }},
+    {{
       "doctype": "Warehouse",
-      "permissions": {
+      "permissions": {{
         "if_owner": null,
         "has_if_owner_enabled": false,
         "select": 0,
@@ -911,31 +998,11 @@ You must return a JSON object with a single key, "roles". The value of this key 
         "import": 0,
         "export": 0,
         "share": 1
-      }
-    }
+      }}
+    }}
   ]
-}
+}}
 ```
-"""
-
-reflection_agent_instructions = """
-# Agent Role
-You are a reflection agent. Your task is to review the generated role permissions and determine if they are sufficient based on the user's description.
-
-# Input
-- `user_description`: The original description of the role.
-- `generated_roles`: The JSON object of roles and permissions that was generated.
-
-# Task
-1.  Compare the `generated_roles` with the `user_description`.
-2.  Determine if the permissions accurately reflect the responsibilities described.
-3.  If the roles are sufficient, respond with "OK".
-4.  If the roles are insufficient or incorrect, provide a brief explanation of what is missing or wrong. This feedback will be used to regenerate the roles.
-
----
-
-User description: {user_description}
-Generated roles: {generated_roles}
 """
 
 permission_description_agent_instructions = """
@@ -944,6 +1011,9 @@ You are an AI assistant that describes ERPNext role permissions in a human-reada
 
 # Task
 Your task is to take a JSON object of role permissions of {role_name} role and describe them in a clear, concise, and easy-to-understand way.
+
+Generated roles:
+{generated_roles}
 
 # Input
 - `generated_roles`: A JSON object of roles and permissions.
@@ -997,7 +1067,4 @@ You must return a string that describes the permissions in a human-readable form
 {role_name} will have the following permissions:
 - **Stock Entry**: {role_name} can read, write, create, delete, print, email, and share stock entries.
 - **Warehouse**: {role_name} can read, write, create, delete, print, email, and share warehouses.
-
-Generated roles:
-{generated_roles}
 """
