@@ -115,13 +115,9 @@ class FrappeClient:
             return None
 
         try:
-            headers = self.headers.copy()
-            headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
-            headers["Accept"] = "application/json"
-            headers["X-Requested-With"] = "XMLHttpRequest"
             response = requests.post(
                 f"{self.frappe_url}/api/method/workspace.workspace.role_manager.get_permissions",
-                headers=headers,
+                headers=self.headers,
                 data={"doctype": "", "role": role},
             )
             response.raise_for_status()
@@ -138,14 +134,9 @@ class FrappeClient:
             return None
 
         try:
-            headers = self.headers.copy()
-            headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
-            headers["Accept"] = "application/json"
-            headers["X-Requested-With"] = "XMLHttpRequest"
-            logger.debug("Fetching roles with headers: " + str(headers))
             response = requests.get(
                 f"{self.frappe_url}/api/method/frappe.client.get_list",
-                headers=headers,
+                headers=self.headers,
                 params={
                     "doctype": "Role",
                     "fields": '["name"]',
