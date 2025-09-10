@@ -22,7 +22,10 @@ async def find_related_role_node(state: RoleGenerationState, config: RunnableCon
     structured_llm = llm.with_structured_output(RelatedRoleResponse)
 
     logger.debug("Cookie: " + str(state.get("cookie", None)))
-    client = FrappeClient(cookie=state.get("cookie", None))
+    client = FrappeClient(
+        cookie=state.get("cookie", None),
+        access_token=state.get("access_token", None),
+    )
     existing_roles = client.get_roles()
     system_prompt = prompts.find_related_role_instructions.format(
         role_name=state["role_name"],
@@ -41,7 +44,11 @@ async def get_role_permissions_node(state: RoleGenerationState, config: Runnable
     logger.debug("---GET ROLE PERMISSIONS NODE---")
     related_role = state.get("related_role", None)
     permissions = await get_role_permissions.ainvoke(
-        {"role": related_role, "cookie": state.get("cookie", None)}
+        {
+            "role": related_role,
+            "cookie": state.get("cookie", None),
+            "access_token": state.get("access_token", None),
+        }
     )
     return {"related_role_permissions": permissions}
 

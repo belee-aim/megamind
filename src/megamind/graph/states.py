@@ -54,6 +54,7 @@ class StockMovementState(TypedDict):
 
 class RoleGenerationState(TypedDict):
     cookie: str
+    access_token: str
     role_name: str
     user_description: str
     generated_roles: Dict[str, Any] | None

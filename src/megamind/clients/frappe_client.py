@@ -4,13 +4,17 @@ from ..utils.config import settings
 
 
 class FrappeClient:
-    def __init__(self, cookie: str | None = None):
+    def __init__(
+        self, cookie: str | None = None, access_token: str | None = None
+    ) -> None:
         self.frappe_url = settings.frappe_url
         self.api_key = settings.frappe_api_key
         self.api_secret = settings.frappe_api_secret
         self.headers = dict()
         if cookie:
             self.headers["Cookie"] = cookie
+        if access_token:
+            self.headers["Authorization"] = f"Bearer {access_token}"
 
     def get_teams(self):
         """
