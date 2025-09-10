@@ -14,7 +14,7 @@ class FrappeClient:
         if cookie:
             self.headers["Cookie"] = cookie
         if access_token:
-            self.headers["Authorization"] = f"Bearer {access_token}"
+            self.headers["Authorization"] = f"{access_token}"
 
     def get_teams(self):
         """
@@ -143,15 +143,13 @@ class FrappeClient:
                 headers=self.headers,
                 params={
                     "doctype": "Role",
-                    "fields": '["name"]',
-                    "filters": "[]",
                     "order_by": "modified desc",
-                    "limit_page_length": "500",
+                    "limit_page_length": 500,
                 },
             )
             response.raise_for_status()
             data = response.json().get("message", {})
-            return [row[0] for row in data.get("values", [])]
+            return [row.get("name", "") for row in data]
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching roles from Frappe: {e}")
             return None
