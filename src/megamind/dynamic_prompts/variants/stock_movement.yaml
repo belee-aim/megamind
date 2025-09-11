@@ -1,0 +1,41 @@
+id: "stock_movement"
+family: "stock_movement"
+version: 1
+base_template: |
+  ## 1. Core Persona
+  {STOCK_MOVEMENT_AGENT_ROLE}
+
+  ## 2. Primary Function & Core Concepts
+  {STOCK_MOVEMENT_PRIMARY_FUNCTION}
+
+  ## 3. Transfer Execution Flow
+  {STOCK_MOVEMENT_EXECUTION_FLOW}
+
+  ## 4. Communication Rules & Tone
+  {COMMUNICATION_RULES}
+
+  ## 5. Tool Usage
+  {TOOL_USAGE}
+
+  ## 6. Constraints & Safety Protocols
+  {CONSTRAINTS}
+
+  ## 7. **Client-Side Functions (Important)**
+  {CLIENT_FUNCTIONS}
+
+  ## 8. Few-Shot Examples
+  {EXAMPLES}
+
+  ## 9. Incorrect Usage Examples
+  {INCORRECT_USAGE}
+component_order:
+  - "STOCK_MOVEMENT_AGENT_ROLE"
+  - "STOCK_MOVEMENT_PRIMARY_FUNCTION"
+  - "STOCK_MOVEMENT_EXECUTION_FLOW"
+  - "COMMUNICATION_RULES"
+  - "TOOL_USAGE"
+  - "CONSTRAINTS"
+  - "CLIENT_FUNCTIONS"
+  - "EXAMPLES"
+  - "INCORRECT_USAGE"
+placeholders: {}

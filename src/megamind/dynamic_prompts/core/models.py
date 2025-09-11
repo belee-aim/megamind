@@ -3,8 +3,6 @@ from typing import List, Dict, Any, Callable, Awaitable
 
 
 class ProviderInfo(BaseModel):
-    # Simplified for this example
-    model_id: str
     family: str = Field(
         default="generic",
         description="The prompt structure name in dynamic_prompts/variants.",
@@ -13,9 +11,6 @@ class ProviderInfo(BaseModel):
 
 class SystemContext(BaseModel):
     provider_info: ProviderInfo
-    cwd: str
-    # Add other context-dependent fields as needed
-    # e.g., user_instructions: str | None = None
     runtime_placeholders: Dict[str, Any] = Field(default_factory=dict)
 
 

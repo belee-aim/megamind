@@ -46,9 +46,6 @@ async def lifespan(app: FastAPI):
             await checkpointer.setup()
         except Exception as e:
             logger.info(f"Could not set up tables: {e}. Assuming they already exist.")
-        stock_movement_graph = await build_stock_movement_graph(
-            checkpointer=checkpointer
-        )
         document_graph = await build_rag_graph(checkpointer=checkpointer)
 
         admin_support_graph = await build_admin_support_graph(checkpointer=checkpointer)
@@ -59,7 +56,7 @@ async def lifespan(app: FastAPI):
 
         app.state.checkpointer = checkpointer
 
-        app.state.stock_movement_graph = stock_movement_graph
+        app.state.stock_movement_graph = document_graph
         app.state.document_graph = document_graph
         app.state.admin_support_graph = admin_support_graph
         app.state.bank_reconciliation_graph = bank_reconciliation_graph
@@ -187,10 +184,7 @@ async def stream(
                 teams = frappe_client.get_teams()
                 team_ids = [team.get("name") for team in teams.values()]
                 context = SystemContext(
-                    provider_info=ProviderInfo(
-                        model_id="gemini-1.5-pro", family="gemini"
-                    ),
-                    cwd="/home/skele/code/megamind",
+                    provider_info=ProviderInfo(family="generic"),
                     runtime_placeholders={"team_ids": team_ids},
                 )
                 system_prompt = await prompt_registry.get(context)
@@ -230,12 +224,29 @@ async def stock_movement(
     try:
         cookie = request.headers.get("cookie")
         graph: CompiledStateGraph = request.app.state.stock_movement_graph
+        config = RunnableConfig(configurable={"thread_id": thread})
+        checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
+        thread_state = await checkpointer.aget(config)
+
+        messages = []
+        if thread_state is None:
+            context = SystemContext(
+                provider_info=ProviderInfo(family="stock_movement"),
+                runtime_placeholders={
+                    "company": request_data.company,
+                },
+            )
+            system_prompt = await prompt_registry.get(context)
+            messages.append(SystemMessage(content=system_prompt))
+
+        if request_data.question:
+            messages.append(HumanMessage(content=request_data.question))
+
         inputs = {
-            "messages": [HumanMessage(content=request_data.question)],
+            "messages": messages,
             "cookie": cookie,
             "company": request_data.company,
         }
-        config = RunnableConfig(configurable={"thread_id": thread})
         return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
