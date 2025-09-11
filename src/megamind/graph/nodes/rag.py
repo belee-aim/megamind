@@ -1,4 +1,3 @@
-from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger

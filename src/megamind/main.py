@@ -15,6 +15,8 @@ from langgraph.graph.state import CompiledStateGraph
 
 from megamind import prompts
 from megamind.clients.frappe_client import FrappeClient
+from megamind.dynamic_prompts.core.models import SystemContext, ProviderInfo
+from megamind.dynamic_prompts.core.registry import prompt_registry
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.admin_support_graph import build_admin_support_graph
 from megamind.graph.workflows.bank_reconciliation_graph import (
@@ -62,6 +64,9 @@ async def lifespan(app: FastAPI):
         app.state.admin_support_graph = admin_support_graph
         app.state.bank_reconciliation_graph = bank_reconciliation_graph
         app.state.role_generation_graph = role_generation_graph
+
+        # Load the prompt registry on startup
+        await prompt_registry.load()
         yield
 
 
@@ -181,7 +186,14 @@ async def stream(
                 frappe_client = FrappeClient(cookie=cookie)
                 teams = frappe_client.get_teams()
                 team_ids = [team.get("name") for team in teams.values()]
-                system_prompt = prompts.rag_node_instructions.format(team_ids=team_ids)
+                context = SystemContext(
+                    provider_info=ProviderInfo(
+                        model_id="gemini-1.5-pro", family="gemini"
+                    ),
+                    cwd="/home/skele/code/megamind",
+                    runtime_placeholders={"team_ids": team_ids},
+                )
+                system_prompt = await prompt_registry.get(context)
                 messages.append(SystemMessage(content=system_prompt))
 
             if request_data.question:

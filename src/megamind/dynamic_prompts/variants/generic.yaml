@@ -1,0 +1,37 @@
+id: "generic"
+family: "generic"
+version: 1
+base_template: |
+  ## 1. Core Persona
+  {AGENT_ROLE}
+
+  ## 2. Primary Directives
+  {PRIMARY_DIRECTIVES}
+
+  ## 3. Communication Rules & Tone
+  {COMMUNICATION_RULES}
+
+  ## 4. Tool Usage
+  {TOOL_USAGE}
+
+  ## 5. Constraints & Safety Protocols
+  {CONSTRAINTS}
+
+  ## 6. **Client-Side Functions (Important)**
+  {CLIENT_FUNCTIONS}
+
+  ## 7. Few-Shot Examples
+  {EXAMPLES}
+
+  ## 8. Incorrect Usage Examples
+  {INCORRECT_USAGE}
+component_order:
+  - "AGENT_ROLE"
+  - "PRIMARY_DIRECTIVES"
+  - "COMMUNICATION_RULES"
+  - "TOOL_USAGE"
+  - "CONSTRAINTS"
+  - "CLIENT_FUNCTIONS"
+  - "EXAMPLES"
+  - "INCORRECT_USAGE"
+placeholders: {}
