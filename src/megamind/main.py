@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
@@ -170,30 +170,43 @@ async def stream(
         graph: CompiledStateGraph = request.app.state.document_graph
         config = RunnableConfig(configurable={"thread_id": thread})
 
+        cookie = request.headers.get("cookie")
+        checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
+        thread_state = await checkpointer.aget(config)
+        messages = []
         inputs = None
+
+        # Check thread_state, initialize system prompt
+        if thread_state is None:
+            frappe_client = FrappeClient(cookie=cookie)
+            teams = frappe_client.get_teams()
+            team_ids = [team.get("name") for team in teams.values()]
+            context = SystemContext(
+                provider_info=ProviderInfo(family="generic"),
+                runtime_placeholders={"team_ids": team_ids},
+            )
+            system_prompt = await prompt_registry.get(context)
+            messages.append(SystemMessage(content=system_prompt))
+
+        # Process interrupt
         if request_data.interrupt_response:
-            inputs = Command(resume=request_data.interrupt_response.model_dump())
-        else:
-            cookie = request.headers.get("cookie")
-            checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
-            thread_state = await checkpointer.aget(config)
+            if thread_state and thread_state["messages"]:
+                last_message = thread_state["messages"][-1]
+                # Check if the last message contains a tool call
+                if isinstance(last_message, AIMessage) and last_message.tool_calls:
+                    inputs = Command(
+                        resume=request_data.interrupt_response.model_dump()
+                    )
+                    return await stream_response_with_ping(graph, inputs, config)
+            # There is no tool call, pass the interrupt response as regular message
+            messages.append(
+                HumanMessage(content=request_data.interrupt_response.model_dump())
+            )
 
-            messages = []
-            if thread_state is None:
-                frappe_client = FrappeClient(cookie=cookie)
-                teams = frappe_client.get_teams()
-                team_ids = [team.get("name") for team in teams.values()]
-                context = SystemContext(
-                    provider_info=ProviderInfo(family="generic"),
-                    runtime_placeholders={"team_ids": team_ids},
-                )
-                system_prompt = await prompt_registry.get(context)
-                messages.append(SystemMessage(content=system_prompt))
+        if request_data.question:
+            messages.append(HumanMessage(content=request_data.question))
 
-            if request_data.question:
-                messages.append(HumanMessage(content=request_data.question))
-
-            inputs = {"messages": messages, "cookie": cookie}
+        inputs = {"messages": messages, "cookie": cookie}
 
         return await stream_response_with_ping(graph, inputs, config)
 
@@ -238,6 +251,21 @@ async def stock_movement(
             )
             system_prompt = await prompt_registry.get(context)
             messages.append(SystemMessage(content=system_prompt))
+
+        # Process interrupt
+        if request_data.interrupt_response:
+            if thread_state and thread_state["messages"]:
+                last_message = thread_state["messages"][-1]
+                # Check if the last message contains a tool call
+                if isinstance(last_message, AIMessage) and last_message.tool_calls:
+                    inputs = Command(
+                        resume=request_data.interrupt_response.model_dump()
+                    )
+                    return await stream_response_with_ping(graph, inputs, config)
+            # There is no tool call, pass the interrupt response as regular message
+            messages.append(
+                HumanMessage(content=request_data.interrupt_response.model_dump())
+            )
 
         if request_data.question:
             messages.append(HumanMessage(content=request_data.question))
