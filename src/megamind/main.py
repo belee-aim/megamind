@@ -243,10 +243,12 @@ async def stock_movement(
 
         messages = []
         if thread_state is None:
+            frappe_client = FrappeClient(cookie=cookie)
+            default_company = frappe_client.get_default_company()
             context = SystemContext(
                 provider_info=ProviderInfo(family="stock_movement"),
                 runtime_placeholders={
-                    "company": request_data.company,
+                    "company": default_company,
                 },
             )
             system_prompt = await prompt_registry.get(context)

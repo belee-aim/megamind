@@ -102,7 +102,7 @@ class FrappeClient:
         try:
             response = requests.get(
                 f"{self.frappe_url}/api/resource/Global Defaults/Global Defaults",
-                headers={"Authorization": f"token {self.api_key}:{self.api_secret}"},
+                headers=self.headers,
             )
             response.raise_for_status()
             data = response.json().get("data", {})
