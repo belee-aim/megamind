@@ -10,7 +10,6 @@ from . import (
     incorrect_usage,
     stock_movement_agent_role,
     stock_movement_primary_function,
-    stock_movement_execution_flow,
 )
 from ..core.models import ComponentFunction
 
@@ -28,5 +27,4 @@ component_registry: Dict[str, ComponentFunction] = {
     # Stock movement components
     "STOCK_MOVEMENT_AGENT_ROLE": stock_movement_agent_role.get_agent_role_section,
     "STOCK_MOVEMENT_PRIMARY_FUNCTION": stock_movement_primary_function.get_primary_function_section,
-    "STOCK_MOVEMENT_EXECUTION_FLOW": stock_movement_execution_flow.get_execution_flow_section,
 }

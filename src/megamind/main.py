@@ -13,7 +13,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
 
-from megamind import prompts
+from . import prompts
 from megamind.clients.frappe_client import FrappeClient
 from megamind.dynamic_prompts.core.models import SystemContext, ProviderInfo
 from megamind.dynamic_prompts.core.registry import prompt_registry

@@ -75,6 +75,17 @@ This directory contains the data models for the application, such as the `ChatRe
 
 This directory contains utility functions for configuration and logging.
 
+### `src/megamind/dynamic_prompts/`
+
+This directory introduces a modular and powerful system for dynamically building prompts. It allows for the creation of complex and context-aware prompts by combining reusable components, which are defined in YAML files. This approach separates the prompt structure from the application logic, making it easier to manage, version, and experiment with different prompt strategies.
+
+-   **`components/`**: This subdirectory contains individual, reusable parts of a prompt, such as the agent's role, constraints, or examples of tool usage. Each component is a self-contained piece of text that can be included in a larger prompt.
+-   **`core/`**: This contains the core logic for the prompt building system.
+    -   `builder.py`: The `PromptBuilder` class reads a YAML configuration, assembles the prompt from the specified components, and formats it with the necessary variables.
+    -   `models.py`: Defines the data models for the dynamic prompt system.
+    -   `registry.py`: Manages the registration and retrieval of prompt components.
+-   **`variants/`**: This directory contains the YAML configuration files that define the structure of different prompts. Each YAML file specifies which components to include and in what order, allowing for the creation of multiple prompt variations for different tasks or models. For example, `generic.yaml` and `stock_movement.yaml` define the prompts for the general-purpose and stock movement agents, respectively.
+
 ## Visual Representation
 
 ### Document Graph
@@ -191,3 +202,27 @@ docker run --env-file .env -p 8000:8000 megamind
 ```
 
 This command starts the container, maps port 8000 of the container to port 8000 on your local machine, and loads the environment variables from the `.env` file.
+
+## Testing the Prompt Builder
+
+The project includes a command-line script to test the output of the dynamic prompt builder without running the main FastAPI application. This is useful for debugging and iterating on prompt templates.
+
+### Running the Test Script
+
+To run the script, execute the following command from the root of the project:
+
+```bash
+python tests/test_prompt_builder.py
+```
+
+By default, this will use the `generic` prompt variant.
+
+### Testing a Specific Variant
+
+You can test other prompt variants by using the `--variant` command-line argument. For example, to test the `stock_movement` variant, run the following command:
+
+```bash
+python tests/test_prompt_builder.py --variant stock_movement
+```
+
+The script will print the fully assembled and formatted prompt to the console, allowing you to inspect the final output.
