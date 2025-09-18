@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import asyncio
 import io
+import json
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -200,7 +201,9 @@ async def stream(
                     return await stream_response_with_ping(graph, inputs, config)
             # There is no tool call, pass the interrupt response as regular message
             messages.append(
-                HumanMessage(content=request_data.interrupt_response.model_dump())
+                HumanMessage(
+                    content=json.dumps(request_data.interrupt_response.model_dump())
+                )
             )
 
         if request_data.question:
@@ -266,7 +269,9 @@ async def stock_movement(
                     return await stream_response_with_ping(graph, inputs, config)
             # There is no tool call, pass the interrupt response as regular message
             messages.append(
-                HumanMessage(content=request_data.interrupt_response.model_dump())
+                HumanMessage(
+                    content=json.dumps(request_data.interrupt_response.model_dump())
+                )
             )
 
         if request_data.question:
