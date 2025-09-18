@@ -11,6 +11,7 @@ from . import (
     stock_movement_agent_role,
     stock_movement_primary_function,
     accounting_finance_agent_role,
+    accounting_finance_primary_function,
 )
 from ..core.models import ComponentFunction
 
@@ -30,4 +31,5 @@ component_registry: Dict[str, ComponentFunction] = {
     "STOCK_MOVEMENT_PRIMARY_FUNCTION": stock_movement_primary_function.get_primary_function_section,
     # Accounting & Finance components
     "ACCOUNTING_FINANCE_AGENT_ROLE": accounting_finance_agent_role.get_agent_role_section,
+    "ACCOUNTING_FINANCE_PRIMARY_FUNCTION": accounting_finance_primary_function.get_primary_function_section,
 }

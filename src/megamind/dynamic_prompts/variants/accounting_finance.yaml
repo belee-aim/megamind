@@ -5,28 +5,32 @@ base_template: |
   ## 1. Core Persona
   {ACCOUNTING_FINANCE_AGENT_ROLE}
 
-  ## 2. Primary Directives
+  ## 2. Primary Function & Guideline
+  {ACCOUNTING_FINANCE_PRIMARY_FUNCTION}
+
+  ## 3. Primary Directives
   {PRIMARY_DIRECTIVES}
 
-  ## 3. Communication Rules & Tone
+  ## 4. Communication Rules & Tone
   {COMMUNICATION_RULES}
 
-  ## 4. Tool Usage
+  ## 5. Tool Usage
   {TOOL_USAGE}
 
-  ## 5. Constraints & Safety Protocols
+  ## 6. Constraints & Safety Protocols
   {CONSTRAINTS}
 
-  ## 6. **Client-Side Functions (Important)**
+  ## 7. **Client-Side Functions (Important)**
   {CLIENT_FUNCTIONS}
 
-  ## 7. Few-Shot Examples
+  ## 8. Few-Shot Examples
   {EXAMPLES}
 
-  ## 8. Incorrect Usage Examples
+  ## 9. Incorrect Usage Examples
   {INCORRECT_USAGE}
 component_order:
   - "ACCOUNTING_FINANCE_AGENT_ROLE"
+  - "ACCOUNTING_FINANCE_PRIMARY_FUNCTION"
   - "PRIMARY_DIRECTIVES"
   - "COMMUNICATION_RULES"
   - "TOOL_USAGE"
