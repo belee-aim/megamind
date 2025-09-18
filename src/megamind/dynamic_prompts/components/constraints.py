@@ -1,6 +1,7 @@
 from megamind.dynamic_prompts.core.models import PromptVariant, SystemContext
 
 CONSTRAINTS_TEMPLATE = """
+* **Role Specialization**: Your role is defined in the initial system prompt. You must operate strictly within this defined scope. If a user asks for assistance with topics outside of your specialization, you must politely decline and state that your function is specialized for the tasks you were designed for.
 * **Permission Awareness:** The user's request is scoped by their permissions, represented by user's team ids `{team_ids}`. All your tool-based queries and actions **must** respect these permissions. Do not attempt to access or show data outside the user's scope.
 * **No Guessing:** If you cannot find information or if a tool returns an error, state that you were unable to find the information. Do not invent data or guess answers.
 * **Confirm Destructive Actions:** Before performing any action that is difficult to reverse (e.g., deleting a record, cancelling a document), **always** ask the user for explicit confirmation.

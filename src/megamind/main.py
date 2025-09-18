@@ -153,17 +153,15 @@ async def stream_response_with_ping(graph, inputs, config):
     return StreamingResponse(response_generator(), media_type="text/event-stream")
 
 
-@app.post("/api/v1/stream/{thread}")
-async def stream(
+async def _handle_chat_stream(
     request: Request,
     request_data: ChatRequest,
-    thread: str = None,
+    thread: str,
+    prompt_family: str,
 ):
     """
-    Endpoint to chat with AI models.
-    Streams the response from the AI model.
+    Handles the common logic for streaming chat responses.
     """
-
     if not thread:
         raise HTTPException(status_code=400, detail="Thread parameter is required")
 
@@ -175,52 +173,90 @@ async def stream(
         checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
         thread_state = await checkpointer.aget(config)
         messages = []
-        inputs = None
 
-        # Check thread_state, initialize system prompt
+        # Initialize system prompt if it's a new thread
         if thread_state is None:
             frappe_client = FrappeClient(cookie=cookie)
-            teams = frappe_client.get_teams()
-            team_ids = [team.get("name") for team in teams.values()]
+            runtime_placeholders = {}
+            if prompt_family == "generic":
+                teams = frappe_client.get_teams()
+                runtime_placeholders["team_ids"] = [
+                    team.get("name") for team in teams.values()
+                ]
+            else:
+                runtime_placeholders["company"] = frappe_client.get_default_company()
+
             context = SystemContext(
-                provider_info=ProviderInfo(family="generic"),
-                runtime_placeholders={"team_ids": team_ids},
+                provider_info=ProviderInfo(family=prompt_family),
+                runtime_placeholders=runtime_placeholders,
             )
             system_prompt = await prompt_registry.get(context)
             messages.append(SystemMessage(content=system_prompt))
 
-        # Process interrupt
+        # Process interruption if any
         if request_data.interrupt_response:
             if thread_state and thread_state["messages"]:
                 last_message = thread_state["messages"][-1]
-                # Check if the last message contains a tool call
                 if isinstance(last_message, AIMessage) and last_message.tool_calls:
                     inputs = Command(
                         resume=request_data.interrupt_response.model_dump()
                     )
                     return await stream_response_with_ping(graph, inputs, config)
-            # There is no tool call, pass the interrupt response as regular message
+
             messages.append(
                 HumanMessage(
                     content=json.dumps(request_data.interrupt_response.model_dump())
                 )
             )
 
+        # Add user's question to the message list
         if request_data.question:
             messages.append(HumanMessage(content=request_data.question))
 
-        inputs = {"messages": messages, "cookie": cookie}
+        inputs = {
+            "messages": messages,
+            "cookie": cookie,
+            "company": request_data.company,
+        }
 
         return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
+        logger.error(f"HTTP error in chat stream for {prompt_family}: {e}")
         raise e
     except Exception as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
+        logger.error(f"Unexpected error in chat stream for {prompt_family}: {e}")
         raise HTTPException(
             status_code=500, detail=f"An unexpected error occurred: {str(e)}"
         )
+
+
+@app.post("/api/v1/stream/{thread}")
+async def stream(
+    request: Request,
+    request_data: ChatRequest,
+    thread: str = None,
+):
+    """
+    Endpoint to chat with AI models.
+    Streams the response from the AI model.
+    """
+    return await _handle_chat_stream(request, request_data, thread, "generic")
+
+
+@app.post("/api/v1/accounting-finance/stream/{thread}")
+async def accounting_finance(
+    request: Request,
+    request_data: ChatRequest,
+    thread: str = None,
+):
+    """
+    Endpoint to chat with Accounting and Finance AI Agent.
+    Streams the response from the AI model.
+    """
+    return await _handle_chat_stream(
+        request, request_data, thread, "accounting_finance"
+    )
 
 
 @app.post("/api/v1/stock-movement/stream/{thread}")
@@ -233,65 +269,7 @@ async def stock_movement(
     Endpoint to chat with Stock movement AI Agent.
     Streams the response from the AI model.
     """
-
-    if not thread:
-        raise HTTPException(status_code=400, detail="Thread parameter is required")
-
-    try:
-        cookie = request.headers.get("cookie")
-        graph: CompiledStateGraph = request.app.state.stock_movement_graph
-        config = RunnableConfig(configurable={"thread_id": thread})
-        checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
-        thread_state = await checkpointer.aget(config)
-
-        messages = []
-        if thread_state is None:
-            frappe_client = FrappeClient(cookie=cookie)
-            default_company = frappe_client.get_default_company()
-            context = SystemContext(
-                provider_info=ProviderInfo(family="stock_movement"),
-                runtime_placeholders={
-                    "company": default_company,
-                },
-            )
-            system_prompt = await prompt_registry.get(context)
-            messages.append(SystemMessage(content=system_prompt))
-
-        # Process interrupt
-        if request_data.interrupt_response:
-            if thread_state and thread_state["messages"]:
-                last_message = thread_state["messages"][-1]
-                # Check if the last message contains a tool call
-                if isinstance(last_message, AIMessage) and last_message.tool_calls:
-                    inputs = Command(
-                        resume=request_data.interrupt_response.model_dump()
-                    )
-                    return await stream_response_with_ping(graph, inputs, config)
-            # There is no tool call, pass the interrupt response as regular message
-            messages.append(
-                HumanMessage(
-                    content=json.dumps(request_data.interrupt_response.model_dump())
-                )
-            )
-
-        if request_data.question:
-            messages.append(HumanMessage(content=request_data.question))
-
-        inputs = {
-            "messages": messages,
-            "cookie": cookie,
-            "company": request_data.company,
-        }
-        return await stream_response_with_ping(graph, inputs, config)
-
-    except HTTPException as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
-        raise e
-    except Exception as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
-        )
+    return await _handle_chat_stream(request, request_data, thread, "stock_movement")
 
 
 @app.post("/api/v1/admin-support/stream/{thread}")
