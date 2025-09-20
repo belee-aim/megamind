@@ -6,7 +6,7 @@ Smart stock movement processing that only requires item code and quantity from u
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from megamind.clients.manager import client_manager
+from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.states import StockMovementState
 
@@ -16,7 +16,7 @@ from ..nodes.stock_movement.smart_stock_movement_node import smart_stock_movemen
 async def build_stock_movement_graph(checkpointer: AsyncPostgresSaver = None):
     """
     Builds the stock movement workflow using intelligent single-node approach.
-    
+
     ARCHITECTURE:
     ┌─────────────────────────────────────────────────┐
     │         smart_stock_movement_node               │
@@ -26,10 +26,10 @@ async def build_stock_movement_graph(checkpointer: AsyncPostgresSaver = None):
     │  ├─ Create Stock Entry via MCP                  │
     │  └─ Return formatted success message            │
     └─────────────────────────────────────────────────┘
-    
+
     FEATURES:
     - Only asks for item code and quantity
-    - Auto-warehouse selection  
+    - Auto-warehouse selection
     - Enhanced error handling
     - Mongolian language support
     - Smart item search (exact + fuzzy)

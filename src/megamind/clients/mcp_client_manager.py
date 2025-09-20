@@ -6,7 +6,7 @@ from megamind.utils.config import settings
 
 
 # TODO: Frappe client initialization should receive a cookie or token for authentication
-class ClientManager:
+class McpClientManager:
     def __init__(self):
         self._client: Optional[MultiServerMCPClient] = None
         self._is_initialized: bool = False
@@ -16,12 +16,13 @@ class ClientManager:
         if self._is_initialized:
             logger.debug("MCP client already initialized, skipping...")
             return
-        
+
         if self._client is None:
             servers_config = {}
             # Add erpnext server if path is configured
-            if (settings.frappe_mcp_server_path != "none" and 
-                os.path.exists(settings.frappe_mcp_server_path)):
+            if settings.frappe_mcp_server_path != "none" and os.path.exists(
+                settings.frappe_mcp_server_path
+            ):
                 servers_config["erpnext"] = {
                     "command": "node",
                     "args": [settings.frappe_mcp_server_path],
@@ -35,10 +36,11 @@ class ClientManager:
                         "PROCESS_ID": str(os.getpid()),
                     },
                 }
-            
+
             # Add frappe_assistant_core server if path is configured and exists
-            if (settings.frappe_assistant_core_server_path != "none" and 
-                os.path.exists(settings.frappe_assistant_core_server_path)):
+            if settings.frappe_assistant_core_server_path != "none" and os.path.exists(
+                settings.frappe_assistant_core_server_path
+            ):
                 servers_config["frappe_assistant_core"] = {
                     "command": "python",
                     "args": [settings.frappe_assistant_core_server_path],
@@ -52,11 +54,15 @@ class ClientManager:
                         "PROCESS_ID": str(os.getpid()),
                     },
                 }
-            
+
             if not servers_config:
-                raise RuntimeError("No MCP servers configured. Please set up at least one MCP server.")
-                
-            logger.info(f"Initializing MCP client with servers: {list(servers_config.keys())}")
+                raise RuntimeError(
+                    "No MCP servers configured. Please set up at least one MCP server."
+                )
+
+            logger.info(
+                f"Initializing MCP client with servers: {list(servers_config.keys())}"
+            )
             self._client = MultiServerMCPClient(servers_config)
             self._is_initialized = True
 
@@ -64,7 +70,7 @@ class ClientManager:
         """Cleanup the MCP client connections."""
         if self._client is None:
             return
-            
+
         try:
             logger.info("Cleaning up MCP client connections...")
             await self._cleanup_main_client()
@@ -78,7 +84,7 @@ class ClientManager:
 
     async def _cleanup_main_client(self):
         """Cleanup the main client connection."""
-        cleanup_methods = ['close', 'cleanup', 'disconnect']
+        cleanup_methods = ["close", "cleanup", "disconnect"]
         for method_name in cleanup_methods:
             if hasattr(self._client, method_name):
                 method = getattr(self._client, method_name)
@@ -88,16 +94,18 @@ class ClientManager:
 
     async def _cleanup_server_connections(self):
         """Cleanup individual server connections."""
-        if not hasattr(self._client, '_servers'):
+        if not hasattr(self._client, "_servers"):
             return
-            
+
         for server_name, server in self._client._servers.items():
-            if hasattr(server, 'close'):
+            if hasattr(server, "close"):
                 try:
                     await server.close()
                     logger.debug(f"Closed connection to server: {server_name}")
                 except Exception as e:
-                    logger.warning(f"Error closing connection to server {server_name}: {e}")
+                    logger.warning(
+                        f"Error closing connection to server {server_name}: {e}"
+                    )
 
     def get_client(self) -> MultiServerMCPClient:
         """Returns the MCP client instance."""
@@ -111,4 +119,4 @@ class ClientManager:
         return self._is_initialized
 
 
-client_manager = ClientManager()
+client_manager = McpClientManager()

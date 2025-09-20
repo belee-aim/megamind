@@ -2,13 +2,17 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from megamind.clients.manager import client_manager
+from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 
 from megamind.graph.states import AgentState
-from megamind.graph.nodes.bank_reconciliation_agent import bank_reconciliation_agent_node
+from megamind.graph.nodes.bank_reconciliation_agent import (
+    bank_reconciliation_agent_node,
+)
 from megamind.graph.nodes.content_agent import content_agent_node
-from megamind.graph.nodes.integrations.bank_reconciliation_model import bank_reconciliation_model_node
+from megamind.graph.nodes.integrations.bank_reconciliation_model import (
+    bank_reconciliation_model_node,
+)
 
 
 def route_tools_from_bank_reconciliation(state: AgentState) -> str:

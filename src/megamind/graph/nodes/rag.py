@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind import prompts
-from megamind.clients.manager import client_manager
+from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.tools import frappe_retriever
 

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     llama_cloud_api_key: str
     frappe_mcp_server_path: str = "none"
     frappe_assistant_core_server_path: str = "none"
+    minion_api_url: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

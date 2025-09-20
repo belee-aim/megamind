@@ -4,11 +4,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind import prompts
-from megamind.clients.frappe_client import FrappeClient
 from megamind.configuration import Configuration
-from megamind.graph.schemas import RoleGenerationResponse, RelatedRoleResponse
+from megamind.graph.schemas import RoleGenerationResponse
 from megamind.graph.states import RoleGenerationState
-from megamind.graph.tools.permission_tools import get_role_permissions
+from megamind.graph.tools.minion_tools import search_role_permissions
 
 
 async def find_related_role_node(state: RoleGenerationState, config: RunnableConfig):
@@ -17,39 +16,12 @@ async def find_related_role_node(state: RoleGenerationState, config: RunnableCon
     """
     logger.debug("---FIND RELATED ROLE NODE---")
 
-    configurable = Configuration.from_runnable_config(config)
-    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
-    structured_llm = llm.with_structured_output(RelatedRoleResponse)
+    user_description = state["user_description"]
+    role_name = state["role_name"]
 
-    logger.debug("Cookie: " + str(state.get("cookie", None)))
-    client = FrappeClient(
-        cookie=state.get("cookie", None),
-        access_token=state.get("access_token", None),
-    )
-    existing_roles = client.get_roles()
-    system_prompt = prompts.find_related_role_instructions.format(
-        role_name=state["role_name"],
-        user_description=state["user_description"],
-        existing_roles=existing_roles,
-    )
+    query = f"Find permissions for a {role_name} with the following description: {user_description}"
+    permissions = await search_role_permissions.ainvoke({"query": query})
 
-    response = await structured_llm.ainvoke(system_prompt)
-    return {"related_role": response.role_name, "existing_roles": existing_roles}
-
-
-async def get_role_permissions_node(state: RoleGenerationState, config: RunnableConfig):
-    """
-    Gets the permissions for the related role.
-    """
-    logger.debug("---GET ROLE PERMISSIONS NODE---")
-    related_role = state.get("related_role", None)
-    permissions = await get_role_permissions.ainvoke(
-        {
-            "role": related_role,
-            "cookie": state.get("cookie", None),
-            "access_token": state.get("access_token", None),
-        }
-    )
     return {"related_role_permissions": permissions}
 
 

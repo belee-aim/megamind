@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from megamind.clients.manager import client_manager
+from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.nodes.rag import rag_node
 from ..states import AgentState

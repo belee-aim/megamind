@@ -4,7 +4,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind import prompts
-from megamind.clients.manager import client_manager
+from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 
 from ..states import AgentState
@@ -30,7 +30,7 @@ async def admin_support_agent_node(state: AgentState, config: RunnableConfig):
     llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
     # Only use ERPNext MCP tools - no frappe_retriever
     mcp_tools = await mcp_client.get_tools()
-    
+
     response = await llm.bind_tools(mcp_tools).ainvoke(messages)
 
     return {
