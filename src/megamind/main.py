@@ -195,8 +195,8 @@ async def _handle_chat_stream(
 
         # Process interruption if any
         if request_data.interrupt_response:
-            if thread_state and thread_state["messages"]:
-                last_message = thread_state["messages"][-1]
+            if thread_state and thread_state["channel_values"]["messages"]:
+                last_message = thread_state["channel_values"]["messages"][-1]
                 if isinstance(last_message, AIMessage) and last_message.tool_calls:
                     inputs = Command(
                         resume=request_data.interrupt_response.model_dump()
