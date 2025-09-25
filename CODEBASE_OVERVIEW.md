@@ -13,32 +13,35 @@ This modular architecture allows each workflow to be developed and maintained in
 This file serves as the entry point for the application. It initializes the FastAPI application and defines the API endpoints.
 
 -   **`lifespan` context manager**: This function is responsible for initializing the `langgraph` graphs when the application starts up, ensuring they are ready to handle requests. It builds the following graphs:
+    -   `megamind_graph`
     -   `stock_movement_graph`
-    -   `document_graph`
     -   `admin_support_graph`
     -   `bank_reconciliation_graph`
+    -   `wiki_graph`
+    -   `document_search_graph`
 -   **API Endpoints**: The application exposes several endpoints, each corresponding to a specific workflow:
     -   **`@app.post("/api/v1/stream")`**: This is the primary endpoint for the document retrieval workflow, which handles general queries.
     -   **`@app.post("/api/v1/stock-movement/stream")`**: A dedicated endpoint for the stock movement workflow.
     -   **`@app.post("/api/v1/admin-support/stream")`**: An endpoint for the administrative support workflow.
     -   **`@app.post("/api/v1/bank-reconciliation/stream")`**: An endpoint for the bank reconciliation workflow.
+    -   **`@app.post("/api/v1/wiki/stream")`**: An endpoint for the wiki search workflow.
+    -   **`@app.post("/api/v1/document/stream")`**: An endpoint for the document search workflow.
     -   **`@app.post("/api/v1/reconciliation/merge")`**: A utility endpoint for merging bank and customer data for reconciliation.
 
 ### `src/megamind/graph/workflows/`
 
 This directory contains the definitions for the various `langgraph` workflows.
 
-#### `document_graph.py`
+#### `megamind_graph.py`
 
-This workflow is designed for general-purpose queries, including retrieval-augmented generation (RAG) and agentic tool use. It is a single-node workflow where the `rag_node` is responsible for the entire process.
+This workflow is designed for general-purpose queries, including retrieval-augmented generation (RAG) and agentic tool use.
 
 -   **Nodes**:
-    -   `rag_node`: The entry point and primary node of the workflow. It can handle both document-related queries by using the `frappe_retriever` tool and perform actions in the ERPNext system using the `erpnext_mcp_tool_agent`.
+    -   `megamind_agent_node`: The entry point and primary node of the workflow. It can perform actions in the ERPNext system using the `erpnext_mcp_tool_agent`.
     -   `content_agent_node`: A node that refines the content before sending the final response.
-    -   `frappe_retriever_tool`: A `ToolNode` for retrieving data from the Frappe API.
     -   `erpnext_mcp_tool_agent`: A `ToolNode` for interacting with an ERPNext MCP server.
     -   `process_and_embed`: Processes and creates embeddings for retrieved data.
--   **Flow**: The `rag_node` is the entry point. It can call tools in a loop, processing the results until it has enough information to generate a final response. The final response is then passed to the `content_agent` for refinement.
+-   **Flow**: The `megamind_agent_node` is the entry point. It can call tools in a loop, processing the results until it has enough information to generate a final response. The final response is then passed to the `content_agent` for refinement.
 
 #### `stock_movement_graph.py`
 
@@ -55,13 +58,23 @@ This workflow provides an intelligent, single-node solution for processing stock
 
 These files define the workflows for administrative support and bank reconciliation, respectively. They follow a similar pattern of defining a `StateGraph` with a set of nodes and edges to accomplish their specific tasks.
 
+#### `wiki_graph.py` and `document_search_graph.py`
+
+These workflows provide simple, single-node solutions for searching the company's wiki and documents, respectively.
+
+-   **Nodes**:
+    -   `wiki_agent_node`: The entry point and primary node of the wiki workflow. It uses the `search_wiki` tool to answer user queries.
+    -   `document_agent_node`: The entry point and primary node of the document search workflow. It uses the `search_document` tool to answer user queries.
+
 ### `src/megamind/graph/nodes/`
 
 This directory contains the functions that define the logic for each node in the graphs. Each subdirectory corresponds to a specific workflow or a set of shared nodes.
 
+-   `minion_agent.py`: This file contains the `wiki_agent_node` and `document_agent_node`, which are responsible for handling wiki and document search queries.
+
 ### `src/megamind/graph/tools/`
 
-This directory contains tools that can be called by the agents during the execution of the graphs, such as the `frappe_retriever` and `inventory_tools`.
+This directory contains tools that can be called by the agents during the execution of the graphs, such as the `inventory_tools`.
 
 ### `src/megamind/clients/`
 
@@ -88,19 +101,16 @@ This directory introduces a modular and powerful system for dynamically building
 
 ## Visual Representation
 
-### Document Graph
+### Megamind Graph
 
 ```mermaid
 graph TD
-    A[User Request: /api/v1/stream] --> B{document_graph};
-    B -- Entry Point --> C[rag_node];
+    A[User Request: /api/v1/stream] --> B{megamind_graph};
+    B -- Entry Point --> C[megamind_agent_node];
 
     subgraph "Tool Calling Loop"
         C -- Call Tool? --> D{Yes};
-        D --> E[frappe_retriever_tool];
         D --> F[erpnext_mcp_tool_agent];
-        E --> G[process_and_embed];
-        G --> C;
         F --> C;
     end
 
@@ -115,6 +125,30 @@ graph TD
     A[User Request: /api/v1/stock-movement/stream] --> B{stock_movement_graph};
     B -- Entry Point --> C[smart_stock_movement_node];
     C --> D[End];
+```
+
+### Wiki Graph
+
+```mermaid
+graph TD
+    A[User Request: /api/v1/wiki/stream] --> B{wiki_graph};
+    B -- Entry Point --> C[wiki_agent_node];
+    C -- Call Tool? --> D{Yes};
+    D --> E[search_wiki];
+    E --> C;
+    C -- Finish --> F[End];
+```
+
+### Document Search Graph
+
+```mermaid
+graph TD
+    A[User Request: /api/v1/document/stream] --> B{document_search_graph};
+    B -- Entry Point --> C[document_agent_node];
+    C -- Call Tool? --> D{Yes};
+    D --> E[search_document];
+    E --> C;
+    C -- Finish --> F[End];
 ```
 
 ## Database Migrations
