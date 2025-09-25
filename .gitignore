@@ -134,3 +134,6 @@ supabase/.branches/
 
 # Notebooks
 notebooks/
+
+# Cline Rules
+.clinerules/

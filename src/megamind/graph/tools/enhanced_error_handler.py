@@ -3,8 +3,7 @@ Enhanced error handling for the stock movement agent.
 This module provides smart error categorization, suggestions, and recovery mechanisms.
 """
 
-from typing import Dict, List, Any, Optional
-from loguru import logger
+from typing import Dict, List, Any
 from enum import Enum
 
 

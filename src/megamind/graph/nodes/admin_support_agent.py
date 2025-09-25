@@ -28,7 +28,7 @@ async def admin_support_agent_node(state: AgentState, config: RunnableConfig):
     messages = [SystemMessage(content=system_prompt)] + state.get("messages", [])
 
     llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
-    # Only use ERPNext MCP tools - no frappe_retriever
+    # Only use ERPNext MCP tools
     mcp_tools = await mcp_client.get_tools()
 
     response = await llm.bind_tools(mcp_tools).ainvoke(messages)

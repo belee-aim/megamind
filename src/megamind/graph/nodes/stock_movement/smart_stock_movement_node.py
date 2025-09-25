@@ -6,11 +6,11 @@ Only requires item code and quantity - everything else is auto-populated.
 
 import json
 import re
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple
 from loguru import logger
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, AIMessage
+from langchain_core.messages import AIMessage
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration

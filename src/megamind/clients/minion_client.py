@@ -1,7 +1,6 @@
 import httpx
 from loguru import logger
 
-from megamind.configuration import Configuration
 
 
 class MinionClient:
@@ -24,6 +23,32 @@ class MinionClient:
             response = await client.post(
                 f"{self.api_url}/api/v1/graphiti/search",
                 headers={"x-graph-name": "role"},
+                json={"query": query},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def search_document(self, query: str):
+        """
+        Searches for documents in the Minion service.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.api_url}/api/v1/graphiti/search",
+                headers={"x-graph-name": "document"},
+                json={"query": query},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def search_wiki(self, query: str):
+        """
+        Searches for knowledge in Company's Wiki in the Minion service.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.api_url}/api/v1/graphiti/search",
+                headers={"x-graph-name": "wiki"},
                 json={"query": query},
             )
             response.raise_for_status()

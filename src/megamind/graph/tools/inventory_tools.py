@@ -3,7 +3,7 @@ Inventory-specific tool filtering for the stock movement agent.
 This module provides filtered MCP tools that only allow inventory-related operations.
 """
 
-from typing import List, Dict, Any
+from typing import List, Any
 from loguru import logger
 
 
@@ -182,7 +182,7 @@ class InventoryToolFilter:
                 logger.debug(f"❌ Filtering out tool: {tool_name}")
         
         # Log tool distribution
-        logger.info(f"📊 Tool Distribution Summary:")
+        logger.info("📊 Tool Distribution Summary:")
         logger.info(f"  - Basic tools: {tool_categories['basic_tools']}")
         logger.info(f"  - Enhanced validation: {tool_categories['enhanced_validation']}")
         logger.info(f"  - Enhanced field options: {tool_categories['enhanced_field_options']}")

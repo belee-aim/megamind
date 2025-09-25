@@ -1,4 +1,4 @@
-from typing import Literal, Dict, Any, Optional
+from typing import Optional
 from pydantic import BaseModel
 
 from megamind.graph.schemas import InterruptResponse
@@ -13,3 +13,7 @@ class ChatRequest(BaseModel):
 class RoleGenerationRequest(BaseModel):
     role_name: str
     user_description: str
+
+
+class MinionRequest(BaseModel):
+    query: str

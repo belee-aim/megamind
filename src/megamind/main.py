@@ -1,20 +1,18 @@
 from contextlib import asynccontextmanager
-import asyncio
 import io
 import json
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
 
-from . import prompts
 from megamind.clients.frappe_client import FrappeClient
 from megamind.dynamic_prompts.core.models import SystemContext, ProviderInfo
 from megamind.dynamic_prompts.core.registry import prompt_registry
@@ -23,15 +21,18 @@ from megamind.graph.workflows.admin_support_graph import build_admin_support_gra
 from megamind.graph.workflows.bank_reconciliation_graph import (
     build_bank_reconciliation_graph,
 )
-from megamind.graph.workflows.document_graph import build_rag_graph
-from megamind.graph.workflows.stock_movement_graph import build_stock_movement_graph
+from megamind.graph.workflows.megamind_graph import build_megamind_graph
 from megamind.graph.workflows.role_generation_graph import (
     build_role_generation_graph,
 )
+from megamind.graph.workflows.wiki_graph import build_wiki_graph
+from megamind.graph.workflows.document_search_graph import build_document_search_graph
+from megamind.api.v1.minion import router as minion_router
 from megamind.models.requests import ChatRequest, RoleGenerationRequest
 from megamind.models.responses import MainResponse
 from megamind.utils.logger import setup_logging
 from megamind.utils.config import settings
+from megamind.utils.streaming import stream_response_with_ping
 
 setup_logging()
 
@@ -47,13 +48,18 @@ async def lifespan(app: FastAPI):
             await checkpointer.setup()
         except Exception as e:
             logger.info(f"Could not set up tables: {e}. Assuming they already exist.")
-        document_graph = await build_rag_graph(checkpointer=checkpointer)
+        document_graph = await build_megamind_graph(checkpointer=checkpointer)
 
         admin_support_graph = await build_admin_support_graph(checkpointer=checkpointer)
         bank_reconciliation_graph = await build_bank_reconciliation_graph(
             checkpointer=checkpointer
         )
         role_generation_graph = await build_role_generation_graph()
+
+        wiki_graph = await build_wiki_graph(checkpointer=checkpointer)
+        document_search_graph = await build_document_search_graph(
+            checkpointer=checkpointer
+        )
 
         app.state.checkpointer = checkpointer
 
@@ -62,6 +68,8 @@ async def lifespan(app: FastAPI):
         app.state.admin_support_graph = admin_support_graph
         app.state.bank_reconciliation_graph = bank_reconciliation_graph
         app.state.role_generation_graph = role_generation_graph
+        app.state.wiki_graph = wiki_graph
+        app.state.document_search_graph = document_search_graph
 
         # Load the prompt registry on startup
         await prompt_registry.load()
@@ -82,6 +90,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(minion_router, prefix="/api/v1", tags=["Minion"])
 
 app.mount("/static", StaticFiles(directory="src/megamind/static"), name="static")
 
@@ -105,52 +115,6 @@ def get_sid_from_cookie(request: Request):
     if not sid:
         raise HTTPException(status_code=400, detail="Session ID not found in cookies")
     return sid
-
-
-async def stream_response_with_ping(graph, inputs, config):
-    """
-    Streams responses from the graph with a ping mechanism to keep the connection alive.
-    """
-    queue = asyncio.Queue()
-
-    async def stream_producer():
-        try:
-            async for chunk, _ in graph.astream(inputs, config, stream_mode="messages"):
-                if isinstance(chunk, AIMessage) and chunk.content:
-                    await queue.put(chunk.content)
-        except Exception as e:
-            logger.error(f"Error in stream producer: {e}")
-            await queue.put(f"Error: {e}")
-        finally:
-            await queue.put(None)  # Signal completion
-
-    async def response_generator():
-        producer_task = asyncio.create_task(stream_producer())
-        while True:
-            try:
-                chunk = await asyncio.wait_for(queue.get(), timeout=2.0)
-                if chunk is None:
-                    yield "event: done\ndata: {}\n\n".encode("utf-8")
-                    break
-                event_str = "event: stream_event\n"
-                for line in str(chunk).splitlines():
-                    data_str = f"data: {line}\n"
-                    yield (event_str + data_str).encode("utf-8")
-                yield b"\n"
-            except asyncio.TimeoutError:
-                yield "event: ping\ndata: {}\n\n".encode("utf-8")
-            except Exception as e:
-                logger.error(f"Error in response generator: {e}")
-                import json
-
-                error_data = {"message": "An error occurred during the stream."}
-                yield f"event: error\ndata: {json.dumps(error_data)}\n\n".encode(
-                    "utf-8"
-                )
-                break
-        await producer_task
-
-    return StreamingResponse(response_generator(), media_type="text/event-stream")
 
 
 async def _handle_chat_stream(

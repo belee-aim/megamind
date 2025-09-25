@@ -1,4 +1,3 @@
-import json
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
