@@ -13,13 +13,15 @@ router = APIRouter()
 
 
 async def _handle_minion_stream(
-    request: Request, chat_request: MinionRequest, graph_name: str, prompt: str
+    request: Request,
+    chat_request: MinionRequest,
+    graph_name: str,
+    prompt: str,
+    thread_id: str,
 ):
-    sid = request.cookies.get("sid")
-    if not sid:
-        raise HTTPException(status_code=400, detail="Session ID not found in cookies")
+    if not thread_id:
+        raise HTTPException(status_code=400, detail="Thread ID not found in path")
 
-    thread_id = sid
     graph: CompiledStateGraph = getattr(request.app.state, graph_name)
     config = RunnableConfig(configurable={"thread_id": thread_id})
 
@@ -41,18 +43,24 @@ async def _handle_minion_stream(
     return await stream_response_with_ping(graph, inputs, config)
 
 
-@router.post("/wiki/stream")
-async def wiki_stream(request: Request, chat_request: MinionRequest):
+@router.post("/wiki/stream/{thread_id}")
+async def wiki_stream(request: Request, chat_request: MinionRequest, thread_id: str):
     """
     Handles streaming chat requests for the wiki graph.
     """
     return await _handle_minion_stream(
-        request, chat_request, "wiki_graph", prompts.wiki_agent_instructions
+        request,
+        chat_request,
+        "wiki_graph",
+        prompts.wiki_agent_instructions,
+        thread_id,
     )
 
 
-@router.post("/document/stream")
-async def document_stream(request: Request, chat_request: MinionRequest):
+@router.post("/document/stream/{thread_id}")
+async def document_stream(
+    request: Request, chat_request: MinionRequest, thread_id: str
+):
     """
     Handles streaming chat requests for the document search graph.
     """
@@ -61,4 +69,5 @@ async def document_stream(request: Request, chat_request: MinionRequest):
         chat_request,
         "document_search_graph",
         prompts.document_agent_instructions,
+        thread_id,
     )
