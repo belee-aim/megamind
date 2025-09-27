@@ -36,7 +36,7 @@ async def _handle_minion_stream(
         system_prompt = prompt.format(company=company)
         messages.append(SystemMessage(content=system_prompt))
 
-    messages.append(HumanMessage(content=chat_request.query))
+    messages.append(HumanMessage(content=chat_request.question))
 
     inputs = {"messages": messages}
 

@@ -16,4 +16,4 @@ class RoleGenerationRequest(BaseModel):
 
 
 class MinionRequest(BaseModel):
-    query: str
+    question: str
