@@ -1,0 +1,48 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout megamind repository
+      uses: actions/checkout@v4
+      with:
+        path: main
+
+    - name: Set up SSH agent for private repository
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.FRAPPE_MCP_SERVER_DEPLOY_KEY }}
+
+    - name: Force git to use SSH
+      run: git config --global url."git@github.com:".insteadOf "https://github.com/"
+
+    - name: Checkout frappe_mcp_server repository
+      uses: actions/checkout@v4
+      with:
+        repository: AIMlink-team/frappe_mcp_server
+        path: main/frappe_mcp_server
+        ref: main
+
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: main
+        push: true
+        tags: ghcr.io/aimlink-team/megamind:latest

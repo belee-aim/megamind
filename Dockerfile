@@ -29,9 +29,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy the application source code
 COPY pyproject.toml uv.lock /app/
 COPY src/ /app/src
-# Clone the frappe_mcp_server repository
-RUN --mount=type=ssh,id=default \
-    git clone git@github.com:AIMlink-team/frappe_mcp_server.git /app/frappe_mcp_server
+# Copy the frappe_mcp_server repository from the build context
+COPY frappe_mcp_server/ /app/frappe_mcp_server
 
 # Install Node.js and npm
 RUN apt-get update && apt-get install -y nodejs npm
@@ -43,12 +42,6 @@ RUN cd /app/frappe_mcp_server && npm install && npm run build
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
-# Clone the frappe_mcp_server repository
-RUN --mount=type=ssh,id=default \
-    git clone git@github.com:buildswithpaul/Frappe_Assistant_Core.git /app/Frappe_Assistant_Core
-
-RUN cd /app/Frappe_Assistant_Core && \
-    pip install -e .
 
 # Final stage
 FROM python:3.12-slim
@@ -66,7 +59,6 @@ WORKDIR /app
 # Copy the environment, but not the source code
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /app/frappe_mcp_server /app/frappe_mcp_server
-COPY --from=builder --chown=app:app /app/Frappe_Assistant_Core /app/Frappe_Assistant_Core
 
 
 ENV PATH="/app/.venv/bin:$PATH"
