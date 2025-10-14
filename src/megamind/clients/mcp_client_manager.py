@@ -31,6 +31,7 @@ class McpClientManager:
                         "FRAPPE_URL": settings.frappe_url,
                         "FRAPPE_API_KEY": settings.frappe_api_key,
                         "FRAPPE_API_SECRET": settings.frappe_api_secret,
+                        "AUTH_MODE": settings.frappe_auth_mode,
                         # Add unique identifiers to prevent connection conflicts
                         "SERVER_ID": "erpnext",
                         "PROCESS_ID": str(os.getpid()),

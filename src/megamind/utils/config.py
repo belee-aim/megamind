@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     frappe_url: str
     frappe_api_key: str
     frappe_api_secret: str
+    frappe_auth_mode: str = "cookie"
     supabase_url: str
     supabase_key: str
     supabase_connection_string: str
