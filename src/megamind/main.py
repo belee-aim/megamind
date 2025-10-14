@@ -28,6 +28,7 @@ from megamind.graph.workflows.role_generation_graph import (
 from megamind.graph.workflows.wiki_graph import build_wiki_graph
 from megamind.graph.workflows.document_search_graph import build_document_search_graph
 from megamind.api.v1.minion import router as minion_router
+from megamind.api.v1.document_extraction import router as document_extraction_router
 from megamind.models.requests import ChatRequest, RoleGenerationRequest
 from megamind.models.responses import MainResponse
 from megamind.utils.logger import setup_logging
@@ -92,6 +93,9 @@ app.add_middleware(
 )
 
 app.include_router(minion_router, prefix="/api/v1", tags=["Minion"])
+app.include_router(
+    document_extraction_router, prefix="/api/v1", tags=["Document Extraction"]
+)
 
 app.mount("/static", StaticFiles(directory="src/megamind/static"), name="static")
 

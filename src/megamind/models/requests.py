@@ -17,3 +17,11 @@ class RoleGenerationRequest(BaseModel):
 
 class MinionRequest(BaseModel):
     question: str
+
+
+class DocumentExtractionRequest(BaseModel):
+    file_names: list[str]
+
+
+class TitanCallbackRequest(BaseModel):
+    documents: list[str]

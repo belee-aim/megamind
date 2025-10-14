@@ -20,13 +20,15 @@ This file serves as the entry point for the application. It initializes the Fast
     -   `wiki_graph`
     -   `document_search_graph`
 -   **API Endpoints**: The application exposes several endpoints, each corresponding to a specific workflow:
-    -   **`@app.post("/api/v1/stream")`**: This is the primary endpoint for the document retrieval workflow, which handles general queries.
-    -   **`@app.post("/api/v1/stock-movement/stream")`**: A dedicated endpoint for the stock movement workflow.
-    -   **`@app.post("/api/v1/admin-support/stream")`**: An endpoint for the administrative support workflow.
-    -   **`@app.post("/api/v1/bank-reconciliation/stream")`**: An endpoint for the bank reconciliation workflow.
-    -   **`@app.post("/api/v1/wiki/stream")`**: An endpoint for the wiki search workflow.
-    -   **`@app.post("/api/v1/document/stream")`**: An endpoint for the document search workflow.
-    -   **`@app.post("/api/v1/reconciliation/merge")`**: A utility endpoint for merging bank and customer data for reconciliation.
+    -   **`@app.post("/api/v1/stream/{thread}")`**: Primary endpoint for general queries using `megamind_graph` with "generic" prompt family.
+    -   **`@app.post("/api/v1/accounting-finance/stream/{thread}")`**: Endpoint for accounting/finance queries using `megamind_graph` with "accounting_finance" prompt family.
+    -   **`@app.post("/api/v1/stock-movement/stream/{thread}")`**: Endpoint for stock movement using `megamind_graph` with "stock_movement" prompt family.
+    -   **`@app.post("/api/v1/admin-support/stream/{thread}")`**: Endpoint using dedicated `admin_support_graph`.
+    -   **`@app.post("/api/v1/bank-reconciliation/stream/{thread}")`**: Endpoint using dedicated `bank_reconciliation_graph`.
+    -   **`@app.post("/api/v1/wiki/stream/{thread_id}")`**: Wiki search endpoint (via `minion_router`) using `wiki_graph`.
+    -   **`@app.post("/api/v1/document/stream/{thread_id}")`**: Document search endpoint (via `minion_router`) using `document_search_graph`.
+    -   **`@app.post("/api/v1/role-generation")`**: Endpoint for generating role permissions using `role_generation_graph`.
+    -   **`@app.post("/api/v1/reconciliation/merge")`**: Utility endpoint for merging bank and customer data (non-graph endpoint).
 
 ### `src/megamind/graph/workflows/`
 
@@ -66,6 +68,13 @@ These workflows provide simple, single-node solutions for searching the company'
     -   `wiki_agent_node`: The entry point and primary node of the wiki workflow. It uses the `search_wiki` tool to answer user queries.
     -   `document_agent_node`: The entry point and primary node of the document search workflow. It uses the `search_document` tool to answer user queries.
 
+#### `role_generation_graph.py`
+
+This workflow generates ERPNext role permissions based on a user's description by finding a similar existing role and adapting its permissions.
+
+-   **Flow**: Multi-node workflow that finds related roles, generates permissions, and describes them in human-readable format.
+-   **Non-streaming**: Unlike other graphs, this one uses `ainvoke()` instead of streaming, returning a complete response at once.
+
 ### `src/megamind/graph/nodes/`
 
 This directory contains the functions that define the logic for each node in the graphs. Each subdirectory corresponds to a specific workflow or a set of shared nodes.
@@ -80,9 +89,37 @@ This directory contains tools that can be called by the agents during the execut
 
 This directory contains clients for interacting with external services like Frappe and Supabase.
 
+### `src/megamind/api/`
+
+This directory contains the API routing layer, organized by API version.
+
+-   **`v1/minion.py`**: Contains a dedicated APIRouter for "minion" services (wiki and document search). This router:
+    -   Exposes `/api/v1/wiki/stream/{thread_id}` and `/api/v1/document/stream/{thread_id}` endpoints
+    -   Uses a shared `_handle_minion_stream()` helper function to reduce code duplication
+    -   Accepts `MinionRequest` objects (simpler than `ChatRequest`, only requires `question`)
+    -   Uses static prompts from `prompts.py` (not the dynamic prompt system)
+    -   Initializes system prompts only for new threads by checking `thread_state`
+    -   Included in `main.py` via `app.include_router(minion_router, prefix="/api/v1")`
+
 ### `src/megamind/models/`
 
-This directory contains the data models for the application, such as the `ChatRequest` model.
+This directory contains Pydantic data models for requests and responses:
+
+-   **`requests.py`**: Defines input models for API endpoints:
+    -   `ChatRequest`: For main chat endpoints (generic, stock_movement, accounting_finance, admin_support, bank_reconciliation). Includes optional `question`, `company`, and `interrupt_response` fields.
+    -   `MinionRequest`: For wiki/document search endpoints. Contains only `question` field.
+    -   `RoleGenerationRequest`: For role generation endpoint. Contains `role_name` and `user_description`.
+-   **`responses.py`**: Defines output models for API responses.
+
+### `src/megamind/prompts.py`
+
+This file contains static prompt templates (strings) for various agents. These are older-style prompts used by specific endpoints:
+-   `wiki_agent_instructions` and `document_agent_instructions`: Used by minion endpoints
+-   `admin_support_agent_instructions` and `bank_reconciliation_agent_instructions`: Used by dedicated graph endpoints
+-   `content_agent_instructions`: Used by content refinement node
+-   Role generation prompts: `find_related_role_instructions`, `role_generation_agent_instructions`, `permission_description_agent_instructions`
+
+**Note**: The main chat endpoints (`/api/v1/stream`, `/api/v1/stock-movement/stream`, `/api/v1/accounting-finance/stream`) use the **dynamic prompt system** in `src/megamind/dynamic_prompts/` instead of these static prompts.
 
 ### `src/megamind/utils/`
 

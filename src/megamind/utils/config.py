@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     frappe_mcp_server_path: str = "none"
     frappe_assistant_core_server_path: str = "none"
     minion_api_url: str = "http://localhost:8000"
+    titan_api_url: str = "http://localhost:8001"
+    tenant_id: str = "aimlink"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
