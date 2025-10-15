@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -369,9 +369,9 @@ async def role_generation(
 
     except Exception as e:
         logger.error(f"Unexpected error in role generation endpoint: {e}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=500,
-            detail=MainResponse(
+            content=MainResponse(
                 message="Error", error=f"An unexpected error occurred: {str(e)}"
             ).model_dump(),
         )

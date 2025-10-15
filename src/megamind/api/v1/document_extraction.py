@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import JSONResponse
 from loguru import logger
 
 from megamind.clients.titan_client import TitanClient
@@ -48,9 +49,9 @@ async def submit_document_extraction(
 
     except Exception as e:
         logger.error(f"Error in document extraction submit endpoint: {e}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=500,
-            detail=MainResponse(
+            content=MainResponse(
                 message="Error",
                 error=f"Failed to submit documents for extraction: {str(e)}",
             ).model_dump(),
@@ -82,9 +83,9 @@ async def document_extraction_callback(
 
     except Exception as e:
         logger.error(f"Error in document extraction callback: {e}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=500,
-            detail=MainResponse(
+            content=MainResponse(
                 message="Error",
                 error=f"Failed to extract company information: {str(e)}",
             ).model_dump(),
