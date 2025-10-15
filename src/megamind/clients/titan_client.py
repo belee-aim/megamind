@@ -39,7 +39,7 @@ class TitanClient:
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{self.api_url}/api/v1/process-request",
+                f"{self.api_url}/api/v1/process-requests",
                 headers={"x-tenant-id": self.tenant_id},
                 json={
                     "file_names": file_names,
