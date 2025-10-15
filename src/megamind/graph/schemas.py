@@ -118,6 +118,9 @@ class CompanyRole(BaseModel):
 
     department: str = Field(description="Department name")
     role: str = Field(description="Role/position name")
+    alias: str = Field(
+        description="Role/position name but translated to English. (If role is in English, same as role)"
+    )
 
 
 class Employee(BaseModel):
@@ -132,7 +135,8 @@ class Employee(BaseModel):
         description="Name of person this employee reports to (infer from hierarchy if not explicit)",
     )
     gender: Optional[str] = Field(
-        default=None, description="Gender of the employee (infer from name if not explicit)"
+        default=None,
+        description="Gender of the employee (infer from name if not explicit)",
     )
     date_of_joining: Optional[str] = Field(
         default=None, description="Date of joining the company"

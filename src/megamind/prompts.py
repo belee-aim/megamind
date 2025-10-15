@@ -894,11 +894,20 @@ Extract each department only once. If multiple employees belong to the same depa
 Extract organizational roles/positions with the EXACT structure:
 - department: The department name (e.g., "Marketing", "Finance", "HR")
 - role: The role/position name (e.g., "Senior Manager", "Director", "Analyst")
+- alias: Role/position name but translated to English. (If role is in English, same as role)
 
-Example:
+Example 1:
 {{
   "department": "Marketing",
+  "role": "Marketing Manager",
   "role": "Marketing Manager"
+}}
+
+Example 2:
+{{
+  "department": "Accounts",
+  "role": "Нягтлан",
+  "alias": "Accountant"
 }}
 
 ## 8. Employees
