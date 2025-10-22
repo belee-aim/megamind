@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
@@ -9,7 +9,6 @@ from megamind.models.requests import (
     TitanCallbackRequest,
 )
 from megamind.models.responses import MainResponse
-from megamind.utils.config import settings
 
 router = APIRouter()
 
@@ -29,7 +28,7 @@ async def submit_document_extraction(
         )
 
         # Generate callback URL
-        callback_url = f"/api/v1/document-extraction/callback"
+        callback_url = "/api/v1/document-extraction/callback"
 
         # Initialize Titan client and submit documents
         titan_client = TitanClient()

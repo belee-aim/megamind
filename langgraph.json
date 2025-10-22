@@ -1,8 +1,0 @@
-{
-  "dependencies": ["."],
-  "graphs": {
-    "agent": "./src/megamind/graph/workflows/stock_movement_graph.py:build_stock_movement_graph"
-  },
-  "env": ".env",
-  "image_distro": "wolfi"
-}
