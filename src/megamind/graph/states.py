@@ -5,7 +5,7 @@ from langchain_core.messages.utils import AnyMessage
 
 class AgentState(TypedDict):
     messages: Annotated[List[AnyMessage], add_messages]
-    cookie: str | None
+    access_token: str | None
     user_consent_response: str | None
 
     # Enhanced stock movement agent state fields
@@ -52,7 +52,6 @@ class StockMovementState(TypedDict):
 
 
 class RoleGenerationState(TypedDict):
-    cookie: str
     access_token: str
     role_name: str
     user_description: str

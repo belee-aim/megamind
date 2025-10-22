@@ -14,7 +14,7 @@ class FrappeClient:
         if cookie:
             self.headers["Cookie"] = cookie
         if access_token:
-            self.headers["Authorization"] = f"{access_token}"
+            self.headers["Authorization"] = f"Bearer {access_token}"
 
     def get_teams(self):
         """

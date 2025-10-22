@@ -12,6 +12,21 @@ from megamind.clients.frappe_client import FrappeClient
 router = APIRouter()
 
 
+def get_token_from_header(request: Request):
+    """
+    Extracts the Bearer token from the Authorization header in the request.
+    """
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        raise HTTPException(status_code=400, detail="Authorization header not found")
+
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=400, detail="Invalid authorization header format. Expected 'Bearer {token}'")
+
+    token = auth_header.replace("Bearer ", "", 1)
+    return token
+
+
 async def _handle_minion_stream(
     request: Request,
     chat_request: MinionRequest,
@@ -30,8 +45,8 @@ async def _handle_minion_stream(
     messages = []
 
     if thread_state is None:
-        cookie = request.headers.get("cookie")
-        frappe_client = FrappeClient(cookie=cookie)
+        access_token = get_token_from_header(request)
+        frappe_client = FrappeClient(access_token=access_token)
         company = frappe_client.get_default_company()
         system_prompt = prompt.format(company=company)
         messages.append(SystemMessage(content=system_prompt))

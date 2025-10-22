@@ -22,12 +22,12 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
     mcp_tools = await mcp_client.get_tools()
     response = await llm.bind_tools(mcp_tools).ainvoke(messages)
 
-    # Add cookie to tool call args if present
+    # Add access token to tool call args if present
     if response.tool_calls:
-        cookie = state.get("cookie")
+        access_token = state.get("access_token")
         for tool_call in response.tool_calls:
             tool_name = tool_call.get("name")
             if any(tool.name == tool_name for tool in mcp_tools):
-                tool_call["args"]["user_token"] = cookie
+                tool_call["args"]["user_token"] = access_token
 
     return {"messages": [response]}

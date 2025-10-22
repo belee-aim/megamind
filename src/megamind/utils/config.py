@@ -9,14 +9,13 @@ class Settings(BaseSettings):
     frappe_url: str
     frappe_api_key: str
     frappe_api_secret: str
-    frappe_auth_mode: str = "cookie"
+    frappe_auth_mode: str = "jwt"
     supabase_url: str
     supabase_key: str
     supabase_connection_string: str
     log_level: str = "INFO"
     json_logs: bool = False
     frappe_mcp_server_path: str = "none"
-    frappe_assistant_core_server_path: str = "none"
     minion_api_url: str = "http://localhost:8000"
     titan_api_url: str = "http://localhost:8001"
     tenant_id: str = "aimlink"

@@ -101,14 +101,19 @@ async def read_root():
     return {"message": "Welcome to the Megamindesu API"}
 
 
-def get_sid_from_cookie(request: Request):
+def get_token_from_header(request: Request):
     """
-    Extracts the session ID from the cookie in the request.
+    Extracts the Bearer token from the Authorization header in the request.
     """
-    sid = request.cookies.get("sid")
-    if not sid:
-        raise HTTPException(status_code=400, detail="Session ID not found in cookies")
-    return sid
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        raise HTTPException(status_code=400, detail="Authorization header not found")
+
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=400, detail="Invalid authorization header format. Expected 'Bearer {token}'")
+
+    token = auth_header.replace("Bearer ", "", 1)
+    return token
 
 
 async def _handle_chat_stream(
@@ -127,14 +132,14 @@ async def _handle_chat_stream(
         graph: CompiledStateGraph = request.app.state.document_graph
         config = RunnableConfig(configurable={"thread_id": thread})
 
-        cookie = request.headers.get("cookie")
+        access_token = get_token_from_header(request)
         checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
         thread_state = await checkpointer.aget(config)
         messages = []
 
         # Initialize system prompt if it's a new thread
         if thread_state is None:
-            frappe_client = FrappeClient(cookie=cookie)
+            frappe_client = FrappeClient(access_token=access_token)
             runtime_placeholders = {}
             if prompt_family == "generic":
                 teams = frappe_client.get_teams()
@@ -173,7 +178,7 @@ async def _handle_chat_stream(
 
         inputs = {
             "messages": messages,
-            "cookie": cookie,
+            "access_token": access_token,
             "company": request_data.company,
         }
 
@@ -274,11 +279,11 @@ async def role_generation(
     """
     try:
         graph: CompiledStateGraph = request.app.state.role_generation_graph
+        access_token = get_token_from_header(request)
         inputs = {
             "role_name": request_data.role_name,
             "user_description": request_data.user_description,
-            "cookie": request.headers.get("cookie"),
-            "access_token": request.headers.get("authorization"),
+            "access_token": access_token,
         }
         logger.debug(f"Role generation inputs: {inputs}")
         final_state = await graph.ainvoke(inputs)

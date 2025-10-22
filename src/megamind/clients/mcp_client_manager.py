@@ -38,24 +38,6 @@ class McpClientManager:
                     },
                 }
 
-            # Add frappe_assistant_core server if path is configured and exists
-            if settings.frappe_assistant_core_server_path != "none" and os.path.exists(
-                settings.frappe_assistant_core_server_path
-            ):
-                servers_config["frappe_assistant_core"] = {
-                    "command": "python",
-                    "args": [settings.frappe_assistant_core_server_path],
-                    "transport": "stdio",
-                    "env": {
-                        "FRAPPE_SERVER_URL": settings.frappe_url,  # Full URL as expected by the bridge
-                        "FRAPPE_API_KEY": settings.frappe_api_key,
-                        "FRAPPE_API_SECRET": settings.frappe_api_secret,
-                        # Add unique identifiers to prevent connection conflicts
-                        "SERVER_ID": "frappe_assistant_core",
-                        "PROCESS_ID": str(os.getpid()),
-                    },
-                }
-
             if not servers_config:
                 raise RuntimeError(
                     "No MCP servers configured. Please set up at least one MCP server."
