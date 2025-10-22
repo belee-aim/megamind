@@ -30,10 +30,6 @@ langgraph dev
 ### Testing and Visualization
 
 ```bash
-# Generate workflow graph images
-python generate_graph_image.py stock_movement
-python generate_graph_image.py document
-
 # Test dynamic prompt builder
 python tests/test_prompt_builder.py
 python tests/test_prompt_builder.py --variant stock_movement
@@ -71,8 +67,6 @@ This is a FastAPI microservice that uses **LangGraph** to build stateful, multi-
 - `/api/v1/stream/{thread}` → megamind_graph (generic prompt family, uses dynamic prompts)
 - `/api/v1/stock-movement/stream/{thread}` → megamind_graph (stock_movement prompt family, uses dynamic prompts)
 - `/api/v1/accounting-finance/stream/{thread}` → megamind_graph (accounting_finance prompt family, uses dynamic prompts)
-- `/api/v1/admin-support/stream/{thread}` → admin_support_graph (uses static prompts from prompts.py)
-- `/api/v1/bank-reconciliation/stream/{thread}` → bank_reconciliation_graph (uses static prompts from prompts.py)
 - `/api/v1/role-generation` → role_generation_graph (non-streaming, uses `ainvoke()`)
 - `/api/v1/reconciliation/merge` → Utility endpoint (no graph, direct Pandas processing)
 
@@ -103,7 +97,6 @@ Located in `src/megamind/dynamic_prompts/`, this system builds prompts from reus
 
 For graphs not using the dynamic prompt system, static prompt templates are defined in `src/megamind/prompts.py`:
 - `wiki_agent_instructions` / `document_agent_instructions`: Used by minion endpoints
-- `admin_support_agent_instructions` / `bank_reconciliation_agent_instructions`: Used by dedicated graphs
 - `content_agent_instructions`: Used by content refinement node in megamind_graph
 - Role generation prompts: `find_related_role_instructions`, `role_generation_agent_instructions`, `permission_description_agent_instructions`
 
@@ -165,10 +158,6 @@ Uses **AsyncPostgresSaver** for checkpoint persistence:
 **wiki_graph & document_search_graph** (workflows/wiki_graph.py, workflows/document_search_graph.py):
 - Single-node solutions: `wiki_agent_node` and `document_agent_node` (nodes/minion_agent.py)
 - Use search_wiki/search_document tools via minion_tools.py
-
-**admin_support_graph & bank_reconciliation_graph:**
-- Multi-node workflows for specific business processes
-- Defined in workflows/admin_support_graph.py and workflows/bank_reconciliation_graph.py
 
 **role_generation_graph** (workflows/role_generation_graph.py):
 - Generates ERPNext role permissions based on user description

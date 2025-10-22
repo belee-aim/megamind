@@ -15,16 +15,13 @@ This file serves as the entry point for the application. It initializes the Fast
 -   **`lifespan` context manager**: This function is responsible for initializing the `langgraph` graphs when the application starts up, ensuring they are ready to handle requests. It builds the following graphs:
     -   `megamind_graph`
     -   `stock_movement_graph`
-    -   `admin_support_graph`
-    -   `bank_reconciliation_graph`
     -   `wiki_graph`
     -   `document_search_graph`
+    -   `role_generation_graph`
 -   **API Endpoints**: The application exposes several endpoints, each corresponding to a specific workflow:
     -   **`@app.post("/api/v1/stream/{thread}")`**: Primary endpoint for general queries using `megamind_graph` with "generic" prompt family.
     -   **`@app.post("/api/v1/accounting-finance/stream/{thread}")`**: Endpoint for accounting/finance queries using `megamind_graph` with "accounting_finance" prompt family.
     -   **`@app.post("/api/v1/stock-movement/stream/{thread}")`**: Endpoint for stock movement using `megamind_graph` with "stock_movement" prompt family.
-    -   **`@app.post("/api/v1/admin-support/stream/{thread}")`**: Endpoint using dedicated `admin_support_graph`.
-    -   **`@app.post("/api/v1/bank-reconciliation/stream/{thread}")`**: Endpoint using dedicated `bank_reconciliation_graph`.
     -   **`@app.post("/api/v1/wiki/stream/{thread_id}")`**: Wiki search endpoint (via `minion_router`) using `wiki_graph`.
     -   **`@app.post("/api/v1/document/stream/{thread_id}")`**: Document search endpoint (via `minion_router`) using `document_search_graph`.
     -   **`@app.post("/api/v1/role-generation")`**: Endpoint for generating role permissions using `role_generation_graph`.
@@ -55,10 +52,6 @@ This workflow provides an intelligent, single-node solution for processing stock
     -   Requires only the item code and quantity from the user.
     -   Automatically selects the warehouse.
     -   Includes enhanced error handling and Mongolian language support.
-
-#### `admin_support_graph.py` and `bank_reconciliation_graph.py`
-
-These files define the workflows for administrative support and bank reconciliation, respectively. They follow a similar pattern of defining a `StateGraph` with a set of nodes and edges to accomplish their specific tasks.
 
 #### `wiki_graph.py` and `document_search_graph.py`
 
@@ -106,7 +99,7 @@ This directory contains the API routing layer, organized by API version.
 This directory contains Pydantic data models for requests and responses:
 
 -   **`requests.py`**: Defines input models for API endpoints:
-    -   `ChatRequest`: For main chat endpoints (generic, stock_movement, accounting_finance, admin_support, bank_reconciliation). Includes optional `question`, `company`, and `interrupt_response` fields.
+    -   `ChatRequest`: For main chat endpoints (generic, stock_movement, accounting_finance). Includes optional `question`, `company`, and `interrupt_response` fields.
     -   `MinionRequest`: For wiki/document search endpoints. Contains only `question` field.
     -   `RoleGenerationRequest`: For role generation endpoint. Contains `role_name` and `user_description`.
 -   **`responses.py`**: Defines output models for API responses.
@@ -115,7 +108,6 @@ This directory contains Pydantic data models for requests and responses:
 
 This file contains static prompt templates (strings) for various agents. These are older-style prompts used by specific endpoints:
 -   `wiki_agent_instructions` and `document_agent_instructions`: Used by minion endpoints
--   `admin_support_agent_instructions` and `bank_reconciliation_agent_instructions`: Used by dedicated graph endpoints
 -   `content_agent_instructions`: Used by content refinement node
 -   Role generation prompts: `find_related_role_instructions`, `role_generation_agent_instructions`, `permission_description_agent_instructions`
 

@@ -17,10 +17,6 @@ from megamind.clients.frappe_client import FrappeClient
 from megamind.dynamic_prompts.core.models import SystemContext, ProviderInfo
 from megamind.dynamic_prompts.core.registry import prompt_registry
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
-from megamind.graph.workflows.admin_support_graph import build_admin_support_graph
-from megamind.graph.workflows.bank_reconciliation_graph import (
-    build_bank_reconciliation_graph,
-)
 from megamind.graph.workflows.megamind_graph import build_megamind_graph
 from megamind.graph.workflows.role_generation_graph import (
     build_role_generation_graph,
@@ -51,10 +47,6 @@ async def lifespan(app: FastAPI):
             logger.info(f"Could not set up tables: {e}. Assuming they already exist.")
         document_graph = await build_megamind_graph(checkpointer=checkpointer)
 
-        admin_support_graph = await build_admin_support_graph(checkpointer=checkpointer)
-        bank_reconciliation_graph = await build_bank_reconciliation_graph(
-            checkpointer=checkpointer
-        )
         role_generation_graph = await build_role_generation_graph()
 
         wiki_graph = await build_wiki_graph(checkpointer=checkpointer)
@@ -66,8 +58,6 @@ async def lifespan(app: FastAPI):
 
         app.state.stock_movement_graph = document_graph
         app.state.document_graph = document_graph
-        app.state.admin_support_graph = admin_support_graph
-        app.state.bank_reconciliation_graph = bank_reconciliation_graph
         app.state.role_generation_graph = role_generation_graph
         app.state.wiki_graph = wiki_graph
         app.state.document_search_graph = document_search_graph
@@ -238,74 +228,6 @@ async def stock_movement(
     Streams the response from the AI model.
     """
     return await _handle_chat_stream(request, request_data, thread, "stock_movement")
-
-
-@app.post("/api/v1/admin-support/stream/{thread}")
-async def admin_support(
-    request: Request,
-    request_data: ChatRequest,
-    thread: str = None,
-):
-    """
-    Endpoint to chat with Admin Support AI Agent.
-    Streams the response from the AI model.
-    """
-
-    if not thread:
-        raise HTTPException(status_code=400, detail="Thread parameter is required")
-
-    try:
-        cookie = request.headers.get("cookie")
-        graph: CompiledStateGraph = request.app.state.admin_support_graph
-        inputs = {
-            "messages": [HumanMessage(content=request_data.question)],
-            "cookie": cookie,
-        }
-        config = RunnableConfig(configurable={"thread_id": thread})
-        return await stream_response_with_ping(graph, inputs, config)
-
-    except HTTPException as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
-        raise e
-    except Exception as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
-        )
-
-
-@app.post("/api/v1/bank-reconciliation/stream/{thread}")
-async def bank_reconciliation(
-    request: Request,
-    request_data: ChatRequest,
-    thread: str = None,
-):
-    """
-    Endpoint to chat with Bank Reconciliation AI Agent.
-    Streams the response from the AI model.
-    """
-
-    if not thread:
-        raise HTTPException(status_code=400, detail="Thread parameter is required")
-
-    try:
-        cookie = request.headers.get("cookie")
-        graph: CompiledStateGraph = request.app.state.bank_reconciliation_graph
-        inputs = {
-            "messages": [HumanMessage(content=request_data.question)],
-            "cookie": cookie,
-        }
-        config = RunnableConfig(configurable={"thread_id": thread})
-        return await stream_response_with_ping(graph, inputs, config)
-
-    except HTTPException as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
-        raise e
-    except Exception as e:
-        logger.error(f"Unexpected error in chat endpoint: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
-        )
 
 
 @app.post("/api/v1/reconciliation/merge")
