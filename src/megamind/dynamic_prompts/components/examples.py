@@ -172,7 +172,60 @@ Please review the sales order details:
 
 Would you like to proceed with creating this order?
 
-### Example 7: Bilingual Support (Mongolian)
+### Example 7: List Operations with Progressive Field Disclosure
+
+**User:** "Show me all sales orders"
+
+**Agent's Internal Monologue:**
+1.  User wants to see all sales orders
+2.  They haven't specified which fields to retrieve
+3.  Following best practice: I'll fetch only the 'name' field by default for performance
+4.  If they need more details, they'll ask
+
+**Agent's Response:**
+I found 15 sales orders:
+<function>
+  <render_list>
+    <title>Sales Orders</title>
+    <description>Select an order to view details</description>
+    <list>
+      <list_item>SO-00145</list_item>
+      <list_item>SO-00146</list_item>
+      <list_item>SO-00147</list_item>
+      <!-- ... more items ... -->
+    </list>
+  </render_list>
+</function>
+
+**User:** "Show me their customer names and totals"
+
+**Agent's Internal Monologue:**
+1.  Now the user wants additional fields: customer name and total
+2.  I'll fetch the list again with fields=['name', 'customer_name', 'grand_total']
+3.  This progressive approach keeps initial queries fast
+
+**Agent's Response:**
+Here are the sales orders with customer names and totals:
+<function>
+  <render_list>
+    <title>Sales Orders</title>
+    <description>Select an order to view details</description>
+    <list>
+      <list_item>SO-00145: ACME Corp - $12,000</list_item>
+      <list_item>SO-00146: Global Tech - $8,500</list_item>
+      <list_item>SO-00147: Innovate Inc - $15,200</list_item>
+      <!-- ... more items ... -->
+    </list>
+  </render_list>
+</function>
+
+**Key Principles:**
+- Default to fetching only 'name' field for list queries
+- Progressively add more fields as user requests them
+- This keeps queries fast and reduces unnecessary data transfer
+- User can always ask for more details
+
+### Example 8: Bilingual Support (Mongolian)
 
 **User (Mongolian):** "ACME компанид зориулсан борлуулалтын захиалгууд харуул"
 
@@ -200,7 +253,7 @@ ACME компанид зориулсан 3 борлуулалтын захиал
   </expected_human_response>
 </function>
 
-### Example 8: Validation and Missing Data
+### Example 9: Validation and Missing Data
 
 **User:** "Create a sales invoice"
 
@@ -219,7 +272,7 @@ I'd be happy to help you create a sales invoice. To proceed, I need some informa
 You can provide this in any format, for example:
 "Create invoice for Global Tech: 5 laptops at $1200 each, 10 mice at $25 each"
 
-### Example 9: Partial Success in Batch Operations
+### Example 10: Partial Success in Batch Operations
 
 **User:** "Submit all draft sales orders for ACME Corp"
 
@@ -243,7 +296,7 @@ I've processed the sales orders for ACME Corp:
 
 Would you like me to help you add the delivery date to SO-003 so we can submit it?
 
-### Example 10: Common Mistakes to Avoid
+### Example 11: Common Mistakes to Avoid
 
 **❌ Incorrect: Missing User-Facing Content for State-Changing Actions**
 

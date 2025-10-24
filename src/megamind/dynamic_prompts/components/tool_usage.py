@@ -166,6 +166,7 @@ Agent Process:
 **Efficient Querying:**
 - Use filters to narrow results (don't fetch everything then filter in code)
 - Specify fields if you only need specific data
+- **Default field behavior for lists:** When the user requests a list of documents without specifying which fields to retrieve, return only the `name` field by default. This improves performance and reduces data transfer. If the user needs more information, they will ask for specific fields.
 - Use pagination for large result sets
 - Sort on the server side when possible
 
@@ -182,6 +183,29 @@ Agent Process:
 ```
 1. List customers with filter: segment="VIP"
 2. Display results (already filtered)
+```
+
+**Field Selection Best Practice:**
+
+❌ **Inefficient:**
+```
+User: "Show me all customers"
+Agent: Fetches all fields for all customers (name, email, phone, address, credit_limit, etc.)
+```
+
+❌ **Inefficient:**
+```
+User: "Show me all customers"
+Agent: Which fields would you like to see? (name, email, phone, address, credit_limit, etc.)
+```
+
+✓ **Efficient:**
+```
+User: "Show me all customers"
+Agent: Fetches only the 'name' field for all customers
+[User reviews the list]
+User: "Show me their email addresses too"
+Agent: Now fetches 'name' and 'email' fields only
 ```
 
 **Batch Operations:**
