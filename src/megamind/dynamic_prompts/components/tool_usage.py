@@ -88,15 +88,14 @@ Your primary tool for interacting with structured data in ERPNext. Supports full
 
 When you make a tool call for create, update, delete, or workflow operations, the system **automatically intercepts** the call and pauses execution for user approval. This is handled by the `human_in_the_loop` node.
 
-**Because of this interception mechanism:**
-- **Read operations (get_document, list_documents)**: No description needed. Make the tool call directly.
-- **State-changing operations (create, update, delete, apply_workflow)**: You MUST provide user-facing confirmation content **in the same AIMessage** as the tool call:
-  1. Natural language confirmation question
-  2. `<function>` block with `<doctype>` XML showing the data
-  3. `<expected_human_response>` tags
-  4. The actual tool call (which will be intercepted)
+**How AIMessage Works:**
+An AIMessage has two parts: `content` (text user sees) and `tool_calls` (function calls). For state-changing operations, you provide BOTH in a single message:
+- `content`: Confirmation question + `<doctype>` XML + `<expected_human_response>`
+- `tool_calls`: The actual function call (intercepted before execution)
 
-**Important:** You output the confirmation content AND make the tool call in a single AIMessage. The tool call will be paused by the system until the user responds.
+**Because of this interception mechanism:**
+- **Read operations (get_document, list_documents)**: No confirmation needed. Make the tool call directly.
+- **State-changing operations (create, update, delete, apply_workflow)**: Include confirmation content + tool call in same AIMessage. System pauses execution until user responds.
 
 #### Pattern 1: Simple Fetch (Read Operation)
 
