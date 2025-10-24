@@ -299,8 +299,11 @@ Example:
 ## 5. Office & Retail Locations
 Extract all physical location information. Differentiate between office locations and retail stores.
 
+**IMPORTANT:** Each location MUST include a `location_type` field set to either "office" or "retail".
+
 **Office Location Example:**
 {{
+  "location_type": "office",
   "name": "Headquarters",
   "address_title": "Corporate Office",
   "address_line1": "123 Main St",
@@ -312,10 +315,13 @@ Extract all physical location information. Differentiate between office location
 
 **Retail Store Example:**
 {{
+  "location_type": "retail",
   "name": "Downtown Store",
   "store_name": "Company Store - Downtown",
   "location": "City Center Mall"
 }}
+
+**Note:** If you cannot determine whether a location is an office or retail store, or if the location information is incomplete, DO NOT include it in the list. Only include locations where you can confidently identify the type and have the required information.
 
 ## 6. Departments
 Extract all unique departments in the organization with the EXACT structure:
@@ -392,16 +398,18 @@ Example:
 **Important Guidelines:**
 1. Extract information ONLY from the provided documents
 2. If a category has NO information in the documents, return an empty list [] or null for that field
-3. DO NOT make up information, but DO infer reports_to based on organizational hierarchy when not explicit
-4. Structure the data clearly with descriptive keys
-5. For lists (policies, locations, departments, roles, employees), each item should follow the exact structure specified above
-6. Be thorough and extract all available information that IS present
-7. Split employee names into firstname and lastname (handle multi-word names appropriately)
-8. Use consistent formatting for dates, addresses, and other structured data
-9. If multiple documents contain conflicting information, note this in the extracted data
-10. For employees, extract ALL employee records found in the documents
-11. For departments, extract unique department names only once
-12. For roles, extract unique department-role combinations
+3. DO NOT return lists containing empty dictionaries {{}} - if there's no data, return an empty list []
+4. DO NOT make up information, but DO infer reports_to based on organizational hierarchy when not explicit
+5. Structure the data clearly with descriptive keys
+6. For lists (policies, locations, departments, roles, employees), each item should follow the exact structure specified above
+7. For office_retail_locations, ALWAYS include the "location_type" field ("office" or "retail")
+8. Be thorough and extract all available information that IS present
+9. Split employee names into firstname and lastname (handle multi-word names appropriately)
+10. Use consistent formatting for dates, addresses, and other structured data
+11. If multiple documents contain conflicting information, note this in the extracted data
+12. For employees, extract ALL employee records found in the documents
+13. For departments, extract unique department names only once
+14. For roles, extract unique department-role combinations
 
 **Data Quality:**
 - Ensure all extracted data is clean and properly formatted

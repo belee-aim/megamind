@@ -18,6 +18,25 @@ async def get_incorrect_usage_section(
     variant: PromptVariant, context: SystemContext
 ) -> str:
     """
-    Returns the incorrect usage examples section for the agent.
+    Returns the incorrect usage examples (anti-patterns) section.
+
+    This component shows what NOT to do - common mistakes and
+    anti-patterns that agents should avoid. By showing negative
+    examples, we reinforce correct behavior patterns.
+
+    Args:
+        variant: The prompt variant configuration
+        context: Runtime context with dynamic values
+
+    Returns:
+        Static incorrect usage examples
+
+    Used by variants:
+        - All variants (shared component)
+
+    Notes:
+        Anti-patterns are as important as positive examples for
+        teaching correct behavior. This component complements the
+        positive examples in examples.py by showing mistakes to avoid.
     """
     return INCORRECT_USAGE_TEXT

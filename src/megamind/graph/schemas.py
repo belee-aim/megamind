@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Literal, Optional, Union
-from pydantic import BaseModel, Field
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
+from pydantic import BaseModel, Field, field_validator
 
 
 class ConversationSummary(BaseModel):
@@ -88,6 +88,9 @@ class Policy(BaseModel):
 class OfficeLocation(BaseModel):
     """Office location information"""
 
+    location_type: Literal["office"] = Field(
+        default="office", description="Type of location (always 'office' for office locations)"
+    )
     name: str = Field(description="Location name")
     address_title: str = Field(description="Address title")
     address_line1: str = Field(description="Address line 1")
@@ -102,6 +105,9 @@ class OfficeLocation(BaseModel):
 class RetailStore(BaseModel):
     """Retail store information"""
 
+    location_type: Literal["retail"] = Field(
+        default="retail", description="Type of location (always 'retail' for retail stores)"
+    )
     name: str = Field(description="Store name")
     store_name: str = Field(description="Store name")
     location: Optional[str] = Field(default=None, description="Location description")
@@ -170,9 +176,11 @@ class CompanyInformation(BaseModel):
         default=[],
         description="List of company policies including HR policies, code of conduct, compliance policies, etc. Return empty list if not found.",
     )
-    office_retail_locations: Optional[List[Union[OfficeLocation, RetailStore]]] = Field(
+    office_retail_locations: Optional[
+        List[Annotated[Union[OfficeLocation, RetailStore], Field(discriminator="location_type")]]
+    ] = Field(
         default=[],
-        description="List of office and retail locations with addresses, types, and operational details. Return empty list if not found.",
+        description="List of office and retail locations with addresses, types, and operational details. Each location must have a 'location_type' field set to either 'office' or 'retail'. Return empty list if not found.",
     )
     departments: Optional[List[Department]] = Field(
         default=[],
@@ -186,3 +194,15 @@ class CompanyInformation(BaseModel):
         default=[],
         description="List of employees with their role, name (split into firstname/lastname), email, and reporting structure. Return empty list if not found.",
     )
+
+    @field_validator("office_retail_locations", mode="before")
+    @classmethod
+    def filter_empty_locations(cls, v):
+        """Filter out empty dictionaries from office_retail_locations"""
+        if isinstance(v, list):
+            # Filter out empty dicts and dicts without required fields
+            return [
+                loc for loc in v
+                if isinstance(loc, dict) and loc and "location_type" in loc
+            ]
+        return v

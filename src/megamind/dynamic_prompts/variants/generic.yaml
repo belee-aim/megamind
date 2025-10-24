@@ -22,9 +22,6 @@ base_template: |
 
   ## 7. Few-Shot Examples
   {EXAMPLES}
-
-  ## 8. Incorrect Usage Examples
-  {INCORRECT_USAGE}
 component_order:
   - "AGENT_ROLE"
   - "PRIMARY_DIRECTIVES"
@@ -33,5 +30,4 @@ component_order:
   - "CONSTRAINTS"
   - "CLIENT_FUNCTIONS"
   - "EXAMPLES"
-  - "INCORRECT_USAGE"
 placeholders: {}

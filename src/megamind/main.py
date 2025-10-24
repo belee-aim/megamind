@@ -130,7 +130,10 @@ def get_token_from_header(request: Request):
 
     if not auth_header.startswith("Bearer "):
         logger.warning("Invalid authorization header format")
-        raise HTTPException(status_code=400, detail="Invalid authorization header format. Expected 'Bearer {token}'")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid authorization header format. Expected 'Bearer {token}'",
+        )
 
     token = auth_header.replace("Bearer ", "", 1)
     logger.debug("Successfully extracted access token from Authorization header")
@@ -146,7 +149,9 @@ async def _handle_chat_stream(
     """
     Handles the common logic for streaming chat responses.
     """
-    logger.info(f"Handling chat stream for thread={thread}, prompt_family={prompt_family}")
+    logger.info(
+        f"Handling chat stream for thread={thread}, prompt_family={prompt_family}"
+    )
 
     if not thread:
         raise HTTPException(status_code=400, detail="Thread parameter is required")
@@ -162,18 +167,13 @@ async def _handle_chat_stream(
 
         # Initialize system prompt if it's a new thread
         if thread_state is None:
-            logger.info(f"Initializing new thread: {thread} with prompt_family: {prompt_family}")
+            logger.debug(
+                f"Initializing new thread: {thread} with prompt_family: {prompt_family}"
+            )
             frappe_client = FrappeClient(access_token=access_token)
             runtime_placeholders = {}
-            if prompt_family == "generic":
-                teams = frappe_client.get_teams()
-                runtime_placeholders["team_ids"] = [
-                    team.get("name") for team in teams.values()
-                ]
-                logger.info(f"Loaded {len(runtime_placeholders['team_ids'])} teams for generic prompt")
-            else:
-                runtime_placeholders["company"] = frappe_client.get_default_company()
-                logger.info(f"Using company: {runtime_placeholders['company']}")
+            runtime_placeholders["company"] = frappe_client.get_default_company()
+            logger.debug(f"Using company: {runtime_placeholders['company']}")
 
             context = SystemContext(
                 provider_info=ProviderInfo(family=prompt_family),
@@ -181,17 +181,19 @@ async def _handle_chat_stream(
             )
             system_prompt = await prompt_registry.get(context)
             messages.append(SystemMessage(content=system_prompt))
-            logger.info(f"System prompt loaded for thread: {thread}")
+            logger.debug(f"System prompt loaded for thread: {thread}")
         else:
-            logger.info(f"Continuing existing thread: {thread}")
+            logger.debug(f"Continuing existing thread: {thread}")
 
         # Process interruption if any
         if request_data.interrupt_response:
-            logger.info(f"Processing interrupt response for thread: {thread}")
+            logger.debug(f"Processing interrupt response for thread: {thread}")
             if thread_state and thread_state["channel_values"]["messages"]:
                 last_message = thread_state["channel_values"]["messages"][-1]
                 if isinstance(last_message, AIMessage) and last_message.tool_calls:
-                    logger.info(f"Resuming with interrupt response for thread: {thread}")
+                    logger.debug(
+                        f"Resuming with interrupt response for thread: {thread}"
+                    )
                     inputs = Command(
                         resume=request_data.interrupt_response.model_dump()
                     )
@@ -205,7 +207,7 @@ async def _handle_chat_stream(
 
         # Add user's question to the message list
         if request_data.question:
-            logger.info(f"Processing user question for thread: {thread}")
+            logger.debug(f"Processing user question for thread: {thread}")
             messages.append(HumanMessage(content=request_data.question))
 
         inputs = {
@@ -214,7 +216,7 @@ async def _handle_chat_stream(
             "company": request_data.company,
         }
 
-        logger.info(f"Starting stream for thread: {thread}")
+        logger.debug(f"Starting stream for thread: {thread}")
         return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
@@ -276,7 +278,9 @@ async def merge_api(
     formatted_bank_file: UploadFile = File(...),
     customers_file: UploadFile = File(...),
 ):
-    logger.info(f"Reconciliation merge request received: bank_file={formatted_bank_file.filename}, customers_file={customers_file.filename}")
+    logger.info(
+        f"Reconciliation merge request received: bank_file={formatted_bank_file.filename}, customers_file={customers_file.filename}"
+    )
 
     # Read uploaded Excel or CSV files
     try:
@@ -334,7 +338,9 @@ async def role_generation(
 
         logger.info(f"Starting role generation for: {request_data.role_name}")
         final_state = await graph.ainvoke(inputs)
-        logger.info(f"Role generation completed successfully for: {request_data.role_name}")
+        logger.info(
+            f"Role generation completed successfully for: {request_data.role_name}"
+        )
 
         return MainResponse(
             response={

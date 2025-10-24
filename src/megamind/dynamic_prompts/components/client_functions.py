@@ -58,5 +58,26 @@ async def get_client_functions_section(
 ) -> str:
     """
     Returns the client-side functions section for the agent.
+
+    This component teaches the agent how to use special XML formats
+    that the client application parses to render UI components. It covers:
+    - <render_list> for displaying lists of items
+    - <doctype> for showing partial/static document data
+    - <doc_item> for triggering full real-time document display
+
+    Args:
+        variant: The prompt variant configuration
+        context: Runtime context with dynamic values
+
+    Returns:
+        Static client functions documentation
+
+    Used by variants:
+        - All variants (shared component)
+
+    Notes:
+        This is a critical component that ensures agents format their
+        responses correctly for the client UI. The XML formats are
+        parsed by the frontend to create rich, interactive displays.
     """
     return CLIENT_FUNCTIONS_TEXT
