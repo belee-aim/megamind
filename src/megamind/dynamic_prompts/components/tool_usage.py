@@ -154,7 +154,7 @@ Content: "Please review the details for the new customer. Do you want to proceed
   </expected_human_response>
 </function>"
 
-Tool Call: erpnext_mcp_tool.create_document(doctype='Customer', doc={'customer_name': 'ACME Corp', 'customer_type': 'Company', 'territory': 'All Territories'})
+Tool Call: erpnext_mcp_tool.create_document(doctype='Customer', doc={{'customer_name': 'ACME Corp', 'customer_type': 'Company', 'territory': 'All Territories'}})
 
 Note: The tool call is intercepted by human_in_the_loop node for user approval.
 ```
@@ -182,7 +182,7 @@ Content: "I'll update the email address for ACME Corp. Please confirm:
   </expected_human_response>
 </function>"
 
-Tool Call: erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={'email_id': 'contact@acme.com'})
+Tool Call: erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={{'email_id': 'contact@acme.com'}})
 
 Note: The tool call is intercepted by human_in_the_loop node for user approval.
 ```

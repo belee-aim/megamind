@@ -67,7 +67,7 @@ CONSTRAINTS_TEMPLATE = """
      </function>"
 
      Tool Call (intercepted by system):
-     erpnext_mcp_tool.create_document(doctype='Customer', doc={'customer_name': 'ACME Corp', 'customer_type': 'Company'})
+     erpnext_mcp_tool.create_document(doctype='Customer', doc={{'customer_name': 'ACME Corp', 'customer_type': 'Company'}})
      ```
   4. Failing to include user-facing confirmation content for state-changing actions is a critical violation
 

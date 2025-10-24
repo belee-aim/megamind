@@ -56,7 +56,7 @@ Please review the details for the new customer. Do you want to proceed with crea
 </function>
 
 Tool Call (intercepted by system for approval):
-erpnext_mcp_tool.create_document(doctype='Customer', doc={'customer_name': 'Innovate Inc', 'customer_type': 'Company', 'territory': 'All Territories'})
+erpnext_mcp_tool.create_document(doctype='Customer', doc={{'customer_name': 'Innovate Inc', 'customer_type': 'Company', 'territory': 'All Territories'}})
 
 ### Example 2B: Update Operation with Confirmation
 
@@ -84,7 +84,7 @@ I'll update the email address for ACME Corp. Please confirm:
 </function>
 
 Tool Call (intercepted by system for approval):
-erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={'email_id': 'contact@acme.com'})
+erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={{'email_id': 'contact@acme.com'}})
 
 ### Example 2C: Delete Operation with Confirmation
 
@@ -391,7 +391,7 @@ Please review the details for the new customer. Do you want to proceed with crea
 **Agent's Incorrect Response:**
 I'll update the email address for ACME Corp. Please confirm.
 
-*Makes tool call: erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={'email_id': 'contact@acme.com'})*
+*Makes tool call: erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={{'email_id': 'contact@acme.com'}})*
 
 **Why this is wrong:** The tool call was made but is MISSING the `<function>` block with `<doctype>` XML and `<expected_human_response>`. The user cannot see what data will be changed before confirming. Even though the system intercepts the call, the user-facing confirmation content is required.
 
