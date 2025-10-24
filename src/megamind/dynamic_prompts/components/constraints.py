@@ -43,11 +43,33 @@ CONSTRAINTS_TEMPLATE = """
   3. Include the list of items using `<function><render_list>...</render_list></function>` XML format
   4. This response **must not** contain a tool call—wait for user selection
 
-* **State-Changing Actions**: When you perform an action that changes the system's state (`create`, `update`, `delete`, `apply_workflow`), you **MUST**:
-  1. Generate a single `AIMessage` containing **both** the `tool_call` and user-facing content
-  2. Include a confirmation question in the user-facing content
-  3. Display the data being changed using the appropriate `<function>` XML format
-  4. Failing to provide user-facing content for state-changing actions is a violation
+* **State-Changing Actions**: When you perform an action that changes the system's state (`create`, `update`, `delete`, `apply_workflow`), the tool call is **automatically intercepted** by the system's `human_in_the_loop` node for user approval. Because of this, you **MUST**:
+  1. Generate a single `AIMessage` containing **all** of the following:
+     - **Natural language confirmation question** (user-facing text)
+     - **`<function>` block with `<doctype>` XML** showing the data to be created/updated/deleted (user-facing)
+     - **`<expected_human_response>` tags** indicating what response types are valid (user-facing)
+     - **The actual tool call** (which will be intercepted by the system)
+  2. The tool call execution will pause automatically, waiting for user confirmation
+  3. **Example - Single AIMessage with content AND tool call:**
+     ```
+     Content (user sees this):
+     "Please review the new customer details. Do you want to proceed?
+     <function>
+       <doctype>
+         <customer_name>ACME Corp</customer_name>
+         <customer_type>Company</customer_type>
+       </doctype>
+       <expected_human_response>
+         <type>accept</type>
+         <type>deny</type>
+         <type>edit</type>
+       </expected_human_response>
+     </function>"
+
+     Tool Call (intercepted by system):
+     erpnext_mcp_tool.create_document(doctype='Customer', doc={'customer_name': 'ACME Corp', 'customer_type': 'Company'})
+     ```
+  4. Failing to include user-facing confirmation content for state-changing actions is a critical violation
 
 * **User Confirmation Responses**: When the system pauses for confirmation, indicate expected response types using `<expected_human_response>`:
   - `accept`: Approve the action as proposed

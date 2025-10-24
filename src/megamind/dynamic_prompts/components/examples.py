@@ -33,13 +33,14 @@ I found multiple sales orders for 'Global Tech'. Please let me know which one yo
 
 **Agent's Internal Monologue:**
 1.  The user wants to create a new customer named 'Innovate Inc'.
-2.  My instructions require that for any `create` operation, I must generate a single `AIMessage` that includes the tool call and the user-facing confirmation content.
-3.  I will construct the `create_document` tool call.
-4.  I will also construct the user-facing content, which includes a question and the customer data formatted with the `<doctype>` function.
-5.  I will output these two parts in a single `AIMessage`.
+2.  My instructions require that for any `create` operation, I must generate a single `AIMessage` that includes BOTH the user-facing confirmation content AND the tool call.
+3.  The tool call will be automatically intercepted by the `human_in_the_loop` node for user approval.
+4.  I will construct the user-facing content (question + `<doctype>` XML + `<expected_human_response>`).
+5.  I will make the `create_document` tool call in the same AIMessage.
 
-**Agent's Final Response to User (This is a single AIMessage containing the user-facing text, the client-side function, and the tool_call):**
+**Agent's Final Response to User (This is a single AIMessage containing BOTH the content AND the tool call):**
 
+Content (what the user sees):
 Please review the details for the new customer. Do you want to proceed with creating it?
 <function>
   <doctype>
@@ -54,9 +55,66 @@ Please review the details for the new customer. Do you want to proceed with crea
   </expected_human_response>
 </function>
 
-<tool_code>
-erpnext_mcp_tool.create_document(doctype='Customer', doc={{'customer_name': 'Innovate Inc', 'customer_type': 'Company', 'territory': 'All Territories'}})
-</tool_code>
+Tool Call (intercepted by system for approval):
+erpnext_mcp_tool.create_document(doctype='Customer', doc={'customer_name': 'Innovate Inc', 'customer_type': 'Company', 'territory': 'All Territories'})
+
+### Example 2B: Update Operation with Confirmation
+
+**User:** "Update the email for customer ACME Corp to contact@acme.com"
+
+**Agent's Internal Monologue:**
+1.  The user wants to update the email for customer ACME Corp
+2.  This is a state-changing action (update), so I must generate a single AIMessage with the confirmation content AND the tool call
+3.  The tool call will be intercepted by the system for user approval
+
+**Agent's Final Response to User (This is a single AIMessage containing BOTH the content AND the tool call):**
+
+Content (what the user sees):
+I'll update the email address for ACME Corp. Please confirm:
+<function>
+  <doctype>
+    <customer_name>ACME Corp</customer_name>
+    <email_id>contact@acme.com</email_id>
+  </doctype>
+  <expected_human_response>
+    <type>accept</type>
+    <type>deny</type>
+    <type>edit</type>
+  </expected_human_response>
+</function>
+
+Tool Call (intercepted by system for approval):
+erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={'email_id': 'contact@acme.com'})
+
+### Example 2C: Delete Operation with Confirmation
+
+**User:** "Delete draft Sales Order SO-00123"
+
+**Agent's Internal Monologue:**
+1.  The user wants to delete a sales order
+2.  This is a destructive state-changing action, so I must generate a single AIMessage with the confirmation content AND the tool call
+3.  I should verify it's a draft (safer to delete) and show clear warning
+4.  The tool call will be intercepted by the system for user approval
+
+**Agent's Final Response to User (This is a single AIMessage containing BOTH the content AND the tool call):**
+
+Content (what the user sees):
+Are you sure you want to delete Sales Order SO-00123? This action cannot be undone.
+<function>
+  <doctype>
+    <name>SO-00123</name>
+    <customer>Global Tech</customer>
+    <status>Draft</status>
+    <total>$12,000</total>
+  </doctype>
+  <expected_human_response>
+    <type>accept</type>
+    <type>deny</type>
+  </expected_human_response>
+</function>
+
+Tool Call (intercepted by system for approval):
+erpnext_mcp_tool.delete_document(doctype='Sales Order', name='SO-00123')
 
 ### Example 3: Displaying Full Document Details
 
@@ -66,6 +124,7 @@ erpnext_mcp_tool.create_document(doctype='Customer', doc={{'customer_name': 'Inn
 1.  The user wants to see the full details for a company named 'Innovate Inc'.
 2.  My instructions state that to display full, real-time details, I should use the `<doc_item>` function. This will trigger the client-side application to fetch and render the data.
 3.  I will construct the response with a brief introductory sentence and the `<doc_item>` function, specifying the doctype as 'Company' and the name as 'Innovate Inc'.
+4.  This is a READ operation, so no description text or confirmation is needed—just the response with the doc_item.
 
 **Agent's Final Response to User:**
 Here are the details for the company 'Innovate Inc'.
@@ -301,13 +360,42 @@ Would you like me to help you add the delivery date to SO-003 so we can submit i
 **❌ Incorrect: Missing User-Facing Content for State-Changing Actions**
 
 **Agent's Incorrect Response:**
-<tool_code>
-erpnext_mcp_tool.apply_workflow(doctype='Sales Order', name='SO-00123', action='Submit')
-</tool_code>
+*Makes tool call: erpnext_mcp_tool.apply_workflow(doctype='Sales Order', name='SO-00123', action='Submit')*
 
-**Why this is wrong:** The `apply_workflow` tool was called without any user-facing content. The "Human in the Loop for State-Changing Actions" rule requires that a confirmation question and a `<function>` tag be included in the same message as the tool call.
+**Why this is wrong:** The tool call was made without any user-facing content. The "Human in the Loop for State-Changing Actions" rule requires that a confirmation question, `<doctype>` XML, and `<expected_human_response>` tags be included in the same AIMessage as the tool call. Even though the system intercepts the call, the user needs to see what action is being proposed.
 
 **✓ Correct Approach:** See Example 4 (Workflow State Management) for proper handling.
+
+**❌ Incorrect: Missing Tool Call for Create Operation**
+
+**Agent's Incorrect Response:**
+Please review the details for the new customer. Do you want to proceed with creating it?
+<function>
+  <doctype>
+    <customer_name>Innovate Inc</customer_name>
+    <customer_type>Company</customer_type>
+  </doctype>
+  <expected_human_response>
+    <type>accept</type>
+    <type>deny</type>
+    <type>edit</type>
+  </expected_human_response>
+</function>
+
+**Why this is wrong:** The response has the confirmation question, `<doctype>` XML, and `<expected_human_response>`, but is MISSING the actual tool call. You must make the tool call in the same AIMessage—the system will intercept it automatically.
+
+**✓ Correct Approach:** See Example 2 (Confirmation Before Creation) for proper handling.
+
+**❌ Incorrect: Missing `<doctype>` XML for Update Operation**
+
+**Agent's Incorrect Response:**
+I'll update the email address for ACME Corp. Please confirm.
+
+*Makes tool call: erpnext_mcp_tool.update_document(doctype='Customer', name='ACME Corp', doc={'email_id': 'contact@acme.com'})*
+
+**Why this is wrong:** The tool call was made but is MISSING the `<function>` block with `<doctype>` XML and `<expected_human_response>`. The user cannot see what data will be changed before confirming. Even though the system intercepts the call, the user-facing confirmation content is required.
+
+**✓ Correct Approach:** See Example 2B (Update Operation with Confirmation) for proper handling.
 """
 
 
