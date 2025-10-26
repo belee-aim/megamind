@@ -45,7 +45,7 @@ class TitanClient:
                 f"{self.api_url}/api/v1/process-requests",
                 headers={"x-tenant-id": self.tenant_id},
                 json={
-                    "file_names": file_names,
+                    "file_names": [file.model_dump() for file in file_names],
                     "callback_url": callback_url,
                 },
                 timeout=30.0,
