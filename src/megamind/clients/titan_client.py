@@ -1,6 +1,7 @@
 import httpx
 from loguru import logger
 
+from megamind.models.requests import DocumentRequestBody
 from megamind.utils.config import settings
 
 
@@ -20,7 +21,9 @@ class TitanClient:
         self.tenant_id = settings.tenant_id
         logger.debug(f"Initializing Titan client with API URL: {self.api_url}")
 
-    async def submit_documents(self, file_names: list[str], callback_url: str) -> str:
+    async def submit_documents(
+        self, file_names: list[DocumentRequestBody], callback_url: str
+    ) -> str:
         """
         Submits a list of file names to the Titan service for processing.
 

@@ -19,8 +19,13 @@ class MinionRequest(BaseModel):
     question: str
 
 
+class DocumentRequestBody(BaseModel):
+    file_id: str
+    file_name: str
+
+
 class DocumentExtractionRequest(BaseModel):
-    file_names: list[str]
+    file_names: list[DocumentRequestBody]
 
 
 class TitanCallbackRequest(BaseModel):
