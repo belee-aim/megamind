@@ -1,10 +1,64 @@
 from langchain_core.runnables import RunnableConfig
+from langchain_core.messages import AIMessage, ToolMessage
 from loguru import logger
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 
 from ..states import AgentState
+
+
+def sanitize_messages_for_claude(messages: list) -> list:
+    """
+    Sanitize messages to meet Claude's strict tool call requirements.
+
+    Claude requires that every AIMessage with tool_calls must be immediately
+    followed by a ToolMessage (or messages) containing the tool results.
+    This function removes incomplete tool call sequences that would cause
+    Claude to return a 400 error.
+
+    Args:
+        messages: List of LangChain messages
+
+    Returns:
+        List of sanitized messages safe for Claude
+    """
+    if not messages:
+        return messages
+
+    sanitized = []
+
+    for i, msg in enumerate(messages):
+        # Check if this is an AI message with tool calls
+        if isinstance(msg, AIMessage) and hasattr(msg, 'tool_calls') and msg.tool_calls:
+            # Check if next message(s) are tool results
+            has_tool_results = False
+
+            if i + 1 < len(messages):
+                # Check if next message is a ToolMessage
+                next_msg = messages[i + 1]
+                if isinstance(next_msg, ToolMessage):
+                    has_tool_results = True
+
+            if has_tool_results:
+                # Valid sequence: AI with tool_calls → ToolMessage
+                sanitized.append(msg)
+            else:
+                # Orphaned tool calls - create a new AI message without tool calls
+                logger.warning(
+                    f"Removing orphaned tool calls from AI message at index {i}"
+                )
+                # Create a copy of the message without tool_calls
+                clean_msg = AIMessage(
+                    content=msg.content,
+                    id=msg.id if hasattr(msg, 'id') else None,
+                )
+                sanitized.append(clean_msg)
+        else:
+            # Not an AI message with tool calls, keep as is
+            sanitized.append(msg)
+
+    return sanitized
 
 
 async def megamind_agent_node(state: AgentState, config: RunnableConfig):
@@ -16,6 +70,10 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
     mcp_client = client_manager.get_client()
 
     messages = state.get("messages", [])
+
+    # Sanitize messages for Claude's strict tool call requirements
+    # This prevents 400 errors when tool_use blocks don't have corresponding tool_result blocks
+    messages = sanitize_messages_for_claude(messages)
 
     llm = configurable.get_chat_model()
     mcp_tools = await mcp_client.get_tools()
