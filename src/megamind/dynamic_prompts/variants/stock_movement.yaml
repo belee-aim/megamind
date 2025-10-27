@@ -2,6 +2,9 @@ id: "stock_movement"
 family: "stock_movement"
 version: 1
 base_template: |
+  # Current Context
+  {CONTEXT_INFO}
+
   ## 1. Core Persona
   {STOCK_MOVEMENT_AGENT_ROLE}
 
@@ -26,6 +29,7 @@ base_template: |
   ## 8. Incorrect Usage Examples
   {INCORRECT_USAGE}
 component_order:
+  - "CONTEXT_INFO"
   - "STOCK_MOVEMENT_AGENT_ROLE"
   - "STOCK_MOVEMENT_PRIMARY_FUNCTION"
   - "COMMUNICATION_RULES"

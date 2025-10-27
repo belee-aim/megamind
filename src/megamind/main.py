@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import datetime
 import io
 import json
 import pandas as pd
@@ -173,7 +174,13 @@ async def _handle_chat_stream(
             frappe_client = FrappeClient(access_token=access_token)
             runtime_placeholders = {}
             runtime_placeholders["company"] = frappe_client.get_default_company()
+            runtime_placeholders["current_datetime"] = datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S %Z"
+            )
             logger.debug(f"Using company: {runtime_placeholders['company']}")
+            logger.debug(
+                f"Current datetime: {runtime_placeholders['current_datetime']}"
+            )
 
             context = SystemContext(
                 provider_info=ProviderInfo(family=prompt_family),

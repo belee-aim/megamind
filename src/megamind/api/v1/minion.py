@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException
 from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -48,7 +49,9 @@ async def _handle_minion_stream(
         access_token = get_token_from_header(request)
         frappe_client = FrappeClient(access_token=access_token)
         company = frappe_client.get_default_company()
-        system_prompt = prompt.format(company=company)
+        current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+        context_info = f"**Current Date and Time**: {current_datetime}\n\n"
+        system_prompt = context_info + prompt.format(company=company)
         messages.append(SystemMessage(content=system_prompt))
 
     messages.append(HumanMessage(content=chat_request.question))

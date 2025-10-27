@@ -2,6 +2,9 @@ id: "accounting_finance"
 family: "accounting_finance"
 version: 1
 base_template: |
+  # Current Context
+  {CONTEXT_INFO}
+
   ## 1. Core Persona
   {ACCOUNTING_FINANCE_AGENT_ROLE}
 
@@ -29,6 +32,7 @@ base_template: |
   ## 9. Incorrect Usage Examples
   {INCORRECT_USAGE}
 component_order:
+  - "CONTEXT_INFO"
   - "ACCOUNTING_FINANCE_AGENT_ROLE"
   - "ACCOUNTING_FINANCE_PRIMARY_FUNCTION"
   - "PRIMARY_DIRECTIVES"

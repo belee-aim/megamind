@@ -1,5 +1,6 @@
 from typing import Dict
 from . import (
+    context_info,
     agent_role,
     primary_directives,
     communication_rules,
@@ -17,6 +18,8 @@ from ..core.models import ComponentFunction
 
 # Maps component ID to the async function
 component_registry: Dict[str, ComponentFunction] = {
+    # Context information
+    "CONTEXT_INFO": context_info.get_context_info_section,
     # Default components
     "AGENT_ROLE": agent_role.get_agent_role_section,
     "PRIMARY_DIRECTIVES": primary_directives.get_primary_directives_section,

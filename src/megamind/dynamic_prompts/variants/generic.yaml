@@ -2,6 +2,9 @@ id: "generic"
 family: "generic"
 version: 1
 base_template: |
+  # Current Context
+  {CONTEXT_INFO}
+
   ## 1. Core Persona
   {AGENT_ROLE}
 
@@ -23,6 +26,7 @@ base_template: |
   ## 7. Few-Shot Examples
   {EXAMPLES}
 component_order:
+  - "CONTEXT_INFO"
   - "AGENT_ROLE"
   - "PRIMARY_DIRECTIVES"
   - "COMMUNICATION_RULES"
