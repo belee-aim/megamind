@@ -3,6 +3,11 @@ from pydantic import BaseModel, Field
 from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
+from langchain_core.language_models import BaseChatModel
+from langchain_core.embeddings import Embeddings
+
+from megamind.factories import LLMFactory
+from megamind.utils.config import settings
 
 
 class Configuration(BaseModel):
@@ -10,7 +15,7 @@ class Configuration(BaseModel):
 
     embedding_model: str = Field(
         default="models/embedding-001",
-        description="The name of the gemini embedding model to use for the agent.",
+        description="The name of the embedding model to use for the agent.",
     )
 
     query_generator_model: str = Field(
@@ -37,3 +42,49 @@ class Configuration(BaseModel):
         values = {k: v for k, v in raw_values.items() if v is not None}
 
         return cls(**values)
+
+    def get_chat_model(self, **kwargs) -> BaseChatModel:
+        """
+        Create a chat model instance using the configured provider.
+
+        Args:
+            **kwargs: Additional arguments to pass to the model constructor
+
+        Returns:
+            BaseChatModel: A chat model instance
+        """
+        # Determine API key (support both new and legacy config)
+        api_key = settings.api_key or settings.google_api_key
+
+        # Use configured model or settings model
+        model = settings.model or self.query_generator_model
+
+        return LLMFactory.create_chat_model(
+            provider=settings.provider,
+            model=model,
+            api_key=api_key,
+            **kwargs,
+        )
+
+    def get_embeddings(self, **kwargs) -> Embeddings:
+        """
+        Create an embeddings model instance using the configured provider.
+
+        Args:
+            **kwargs: Additional arguments to pass to the embeddings constructor
+
+        Returns:
+            Embeddings: An embeddings model instance
+        """
+        # Determine API key (support both new and legacy config)
+        api_key = settings.api_key or settings.google_api_key
+
+        # Use configured embedding model or settings embedding model
+        embedding_model = settings.embedding_model or self.embedding_model
+
+        return LLMFactory.create_embeddings(
+            provider=settings.provider,
+            model=embedding_model,
+            api_key=api_key,
+            **kwargs,
+        )

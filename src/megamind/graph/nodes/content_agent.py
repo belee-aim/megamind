@@ -1,7 +1,6 @@
 import asyncio
 import json
 from langchain_core.runnables import RunnableConfig
-from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind import prompts
@@ -25,11 +24,11 @@ async def _summarize_and_save(state: AgentState, config: RunnableConfig):
     conversation_text = "\n".join([f"{m.type}: {m.content}" for m in messages])
 
     # Use an LLM to generate the summary
-    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
+    llm = configurable.get_chat_model()
     prompt = prompts.content_agent_instructions.format(
         conversation=conversation_text
     )
-    
+
     try:
         response = await llm.ainvoke(prompt)
         try:

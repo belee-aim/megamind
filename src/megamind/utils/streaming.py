@@ -5,6 +5,36 @@ from langchain_core.messages import AIMessage
 import json
 
 
+def extract_text_content(content):
+    """
+    Extract text from content, handling multiple provider formats.
+
+    Different LLM providers return content in different formats:
+    - Gemini: Returns plain string
+    - Claude: Returns list of content blocks with 'type' and 'text' fields
+
+    Args:
+        content: Content from AIMessage, can be str or list
+
+    Returns:
+        str: Extracted text content
+    """
+    if isinstance(content, str):
+        # Gemini format: plain string
+        return content
+
+    elif isinstance(content, list):
+        # Claude format: list of content blocks
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get('type') == 'text':
+                text_parts.append(block.get('text', ''))
+        return ''.join(text_parts)
+
+    # Fallback for unknown formats
+    return str(content)
+
+
 async def stream_response_with_ping(graph, inputs, config):
     """
     Streams responses from the graph with a ping mechanism to keep the connection alive.
@@ -15,7 +45,10 @@ async def stream_response_with_ping(graph, inputs, config):
         try:
             async for chunk, _ in graph.astream(inputs, config, stream_mode="messages"):
                 if isinstance(chunk, AIMessage) and chunk.content:
-                    await queue.put(chunk.content)
+                    # Extract text content, handling different provider formats
+                    text_content = extract_text_content(chunk.content)
+                    if text_content:  # Only queue non-empty text
+                        await queue.put(text_content)
         except Exception as e:
             logger.error(f"Error in stream producer: {e}")
             await queue.put(f"Error: {e}")

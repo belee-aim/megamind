@@ -1,4 +1,3 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind.configuration import Configuration
@@ -24,7 +23,7 @@ async def extract_company_information(documents: list[str]) -> CompanyInformatio
     try:
         # Initialize LLM with configuration
         config = Configuration()
-        llm = ChatGoogleGenerativeAI(model=config.query_generator_model)
+        llm = config.get_chat_model()
 
         # Combine documents into a single text
         combined_documents = "\n\n---DOCUMENT SEPARATOR---\n\n".join(

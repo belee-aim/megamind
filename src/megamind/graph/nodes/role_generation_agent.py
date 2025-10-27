@@ -1,5 +1,4 @@
 from langchain_core.runnables import RunnableConfig
-from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind import prompts
@@ -30,7 +29,7 @@ async def generate_role_node(state: RoleGenerationState, config: RunnableConfig)
     """
     logger.debug("---GENERATE ROLE NODE---")
     configurable = Configuration.from_runnable_config(config)
-    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
+    llm = configurable.get_chat_model()
 
     prompt = prompts.role_generation_agent_instructions.format(
         role_name=state.get("role_name"),
@@ -53,7 +52,7 @@ async def describe_permissions_node(state: RoleGenerationState, config: Runnable
     """
     logger.debug("---DESCRIBE PERMISSIONS NODE---")
     configurable = Configuration.from_runnable_config(config)
-    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
+    llm = configurable.get_chat_model()
 
     formatted_prompt = prompts.permission_description_agent_instructions.format(
         role_name=state.get("role_name", "User"),

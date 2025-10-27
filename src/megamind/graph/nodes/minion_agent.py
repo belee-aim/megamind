@@ -1,5 +1,4 @@
 from langchain_core.runnables import RunnableConfig
-from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind.configuration import Configuration
@@ -15,7 +14,7 @@ async def wiki_agent_node(state: AgentState, config: RunnableConfig):
     messages = state.get("messages", [])
     configurable = Configuration.from_runnable_config(config)
 
-    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
+    llm = configurable.get_chat_model()
     tools = [search_wiki]
     response = await llm.bind_tools(tools).ainvoke(messages)
 
@@ -30,7 +29,7 @@ async def document_agent_node(state: AgentState, config: RunnableConfig):
     messages = state.get("messages", [])
     configurable = Configuration.from_runnable_config(config)
 
-    llm = ChatGoogleGenerativeAI(model=configurable.query_generator_model)
+    llm = configurable.get_chat_model()
     tools = [search_document]
     response = await llm.bind_tools(tools).ainvoke(messages)
 

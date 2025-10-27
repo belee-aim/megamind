@@ -5,17 +5,30 @@ load_dotenv(override=True)
 
 
 class Settings(BaseSettings):
-    google_api_key: str
+    # LLM Provider Configuration
+    provider: str = "GEMINI"  # GEMINI, DEEPSEEK, or CLAUDE
+    api_key: str = ""  # Generic API key for the selected provider
+    model: str = "gemini-2.5-flash"  # Model name for the selected provider
+    embedding_model: str = "models/embedding-001"  # Embedding model name
+
+    # Legacy Gemini configuration (for backward compatibility)
+    google_api_key: str = ""
+
+    # Frappe/ERPNext Configuration
     frappe_url: str
     frappe_api_key: str
     frappe_api_secret: str
     frappe_auth_mode: str = "jwt"
+    frappe_mcp_server_path: str = "none"
+
+    # Supabase Configuration
     supabase_url: str
     supabase_key: str
     supabase_connection_string: str
+
+    # Application Configuration
     log_level: str = "INFO"
     json_logs: bool = False
-    frappe_mcp_server_path: str = "none"
     minion_api_url: str = "http://localhost:8000"
     titan_api_url: str = "http://localhost:8001"
     tenant_id: str = "aimlink"
