@@ -344,7 +344,7 @@ Example 1:
 {{
   "department": "Marketing",
   "role": "Marketing Manager",
-  "role": "Marketing Manager"
+  "alias": "Marketing Manager"
 }}
 
 Example 2:
@@ -360,22 +360,23 @@ Extract employee information with the EXACT structure:
 - firstname: The employee's first name
 - lastname: The employee's last name (or surname)
 - email: The employee's email address (null if not available)
-- reports_to: Name of the person this employee reports to
+- reports_to: Email address of the person this employee reports to
 - gender: Gender of the employee (null if not available)
 - date_of_joining: Date of joining the company (null if not available)
 - date_of_birth: Date of birth (null if not available)
 
 **IMPORTANT for reports_to field:**
-- If explicitly mentioned in the document, use that information
+- `reports_to` should be the EMAIL ADDRESS of the supervisor (not the name)
+- `reports_to` MUST exist for all employees except the CEO/Director ("Захирал")
+- If explicitly mentioned in the document, use that email
 - If NOT explicitly mentioned, INFER based on organizational hierarchy:
   - Look at role titles: "Manager" typically reports to "Director", "Specialist" reports to "Manager", etc.
-  - "Захирал" (Director/CEO) typically has no reports_to (null)
+  - "Захирал" (Director/CEO) has reports_to set to null
   - "Менежер" (Manager) typically reports to "Дарга" (Head/Director) or "Захирал" (CEO)
   - "Зөвлөх" (Consultant/Advisor) typically reports to department head or manager
   - Use department context to identify likely supervisor
-- Only infer if there's a clear logical hierarchy; otherwise use null
-- `reports_to` should be the full name (firstname lastname) of the supervisor
-- If multiple employees report to the same person, ensure consistency in naming
+- If reports_to cannot be explicitly found or inferred from hierarchy, DEFAULT to the CEO's email
+- If multiple employees report to the same person, ensure consistency in the email address used
 - If gender can be inferred from the name, include it; otherwise, set to null
 - If date of joining or date of birth can be found or inferred, include it; otherwise, set to null
 
@@ -385,7 +386,7 @@ Example:
   "firstname": "John",
   "lastname": "Doe",
   "email": "john.doe@company.com",
-  "reports_to": "Jane Smith",
+  "reports_to": "jane.smith@company.com",
   "gender": "Male",
   "date_of_joining": "2020-05-15",
   "date_of_birth": "1985-08-20"
