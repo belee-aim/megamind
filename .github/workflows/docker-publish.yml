@@ -46,4 +46,4 @@ jobs:
       with:
         context: main
         push: true
-        tags: ghcr.io/aimlink-team/megamind:latest
+        tags: ghcr.io/aimlink/megamind:latest
