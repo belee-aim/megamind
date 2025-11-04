@@ -33,4 +33,5 @@ dependencies = [
     "pandas>=2.2.2",
     "openpyxl>=3.1.5",
     "ruff>=0.13.1",
+    "sentry-sdk[fastapi]>=2.38.0",
 ]

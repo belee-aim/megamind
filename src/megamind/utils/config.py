@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     titan_api_url: str = "http://localhost:8001"
     tenant_id: str = "aimlink"
 
+    # Sentry Configuration
+    sentry_dsn: str = ""
+    environment: str = "development"
+    sentry_traces_sample_rate: float = 1.0  # 1.0 = 100%, 0.1 = 10%
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

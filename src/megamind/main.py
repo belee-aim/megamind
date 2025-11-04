@@ -3,6 +3,7 @@ from datetime import datetime
 import io
 import json
 import pandas as pd
+import sentry_sdk
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -85,6 +86,16 @@ async def lifespan(app: FastAPI):
         yield
         logger.info("Application shutdown initiated")
 
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        send_default_pii=True,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        environment=settings.environment,
+    )
+    logger.info(f"Sentry initialized successfully (environment={settings.environment}, traces_sample_rate={settings.sentry_traces_sample_rate})")
+else:
+    logger.info("Sentry DSN not configured, skipping Sentry initialization")
 
 app = FastAPI(
     title="Megamindesu",
