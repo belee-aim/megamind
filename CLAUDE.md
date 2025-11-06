@@ -30,9 +30,11 @@ langgraph dev
 ### Testing and Visualization
 
 ```bash
-# Test dynamic prompt builder
-python tests/test_prompt_builder.py
-python tests/test_prompt_builder.py --variant stock_movement
+# Run tests
+pytest tests/
+
+# Test specific modules
+pytest tests/test_specific_module.py
 ```
 
 ### Docker
@@ -54,19 +56,19 @@ This is a FastAPI microservice that uses **LangGraph** to build stateful, multi-
 **Critical files:**
 - `src/megamind/main.py`: Application entry point, graph initialization, main API endpoints
 - `src/megamind/api/v1/minion.py`: Separate router for wiki/document search endpoints
+- `src/megamind/base_prompt.py`: Base prompt with tool usage instructions
+- `src/megamind/graph/tools/titan_knowledge_tools.py`: LangChain tools for ERPNext knowledge search
+- `src/megamind/clients/titan_client.py`: Client for Titan API (knowledge + embeddings)
 - `src/megamind/graph/workflows/`: Graph definitions (megamind_graph.py, stock_movement_graph.py, etc.)
 - `src/megamind/graph/nodes/`: Node implementations for each graph
 - `src/megamind/graph/states.py`: State schemas for graphs
-- `src/megamind/prompts.py`: Static prompt templates (older style, used by some graphs)
-- `src/megamind/dynamic_prompts/`: Dynamic prompt system (newer, used by megamind_graph)
+- `src/megamind/prompts.py`: Static prompt templates (used by specialized graphs)
 - `langgraph.json`: LangGraph configuration (currently points to stock_movement_graph)
 
 ### API Endpoints and Graph Mapping
 
 **Endpoints in `main.py`:**
-- `/api/v1/stream/{thread}` → megamind_graph (generic prompt family, uses dynamic prompts)
-- `/api/v1/stock-movement/stream/{thread}` → megamind_graph (stock_movement prompt family, uses dynamic prompts)
-- `/api/v1/accounting-finance/stream/{thread}` → megamind_graph (accounting_finance prompt family, uses dynamic prompts)
+- `/api/v1/stream/{thread}` → megamind_graph (uses RAG-augmented prompts from Titan)
 - `/api/v1/role-generation` → role_generation_graph (non-streaming, uses `ainvoke()`)
 - `/api/v1/reconciliation/merge` → Utility endpoint (no graph, direct Pandas processing)
 
@@ -75,27 +77,133 @@ This is a FastAPI microservice that uses **LangGraph** to build stateful, multi-
 - `/api/v1/document/stream/{thread_id}` → document_search_graph (uses static prompts from prompts.py)
 
 **Key differences:**
-- Endpoints using `megamind_graph` share the same graph but load different **prompt families** via the dynamic prompt system
+- Main chat endpoint (`/api/v1/stream/{thread}`) uses RAG to retrieve relevant ERPNext knowledge from Titan
 - Minion endpoints use `MinionRequest` (only `question` field) instead of `ChatRequest`
 - Minion endpoints use a shared `_handle_minion_stream()` handler function
 - Role generation endpoint is non-streaming and returns a complete JSON response
 
-### Dynamic Prompt System
+### Tool-Based Knowledge Retrieval (RAG)
 
-Located in `src/megamind/dynamic_prompts/`, this system builds prompts from reusable YAML-configured components:
-- `components/`: Reusable prompt pieces (agent_role.py, constraints.py, examples.py, etc.)
-- `variants/`: YAML files defining prompt structures (generic.yaml, stock_movement.yaml, etc.)
-- `core/builder.py`: PromptBuilder assembles components based on YAML config
-- `core/registry.py`: Manages component registration and retrieval
+The main chat endpoint uses **Tool-Based RAG** where the LLM decides when and how to search the ERPNext knowledge base using tools, rather than pre-loading context.
+
+**Architecture:**
+- `src/megamind/graph/tools/titan_knowledge_tools.py`: LangChain tools for knowledge search
+- `src/megamind/base_prompt.py`: Base prompt with instructions on when/how to use knowledge tools
+- `src/megamind/clients/titan_client.py`: Client for Titan API (embeddings + knowledge search)
 
 **How it works:**
-1. At startup, `prompt_registry.load()` is called in `main.py:lifespan()`
-2. When a new thread starts, the system prompt is built using `prompt_registry.get(context)` where context includes the prompt family
-3. Components are combined in the order specified in the YAML variant file
+1. System prompt instructs LLM to use `search_erpnext_knowledge` tool for ERPNext-specific questions
+2. LLM receives user query and decides whether knowledge search is needed
+3. If needed, LLM calls tool with appropriate parameters (query, content_types, doctype, etc.)
+4. Tool generates embedding, searches Titan, formats results, and returns to LLM
+5. LLM uses retrieved knowledge to formulate response
+6. LLM can call tool multiple times in same conversation with different queries
+
+**Available Knowledge Tools:**
+- `search_erpnext_knowledge`: Semantic search with filtering by content type, DocType, operation
+- `get_erpnext_knowledge_by_id`: Retrieve specific knowledge entry by ID
+
+**Tool Parameters:**
+- `query` (required): Natural language search query
+- `content_types` (optional): Filter by workflow, best_practice, schema, example, error_pattern, relationship, process
+- `doctype` (optional): Filter by DocType name (e.g., "Sales Order")
+- `operation` (optional): Filter by create, read, update, delete, workflow, search
+- `match_count` (default: 5): Number of results to return
+
+### Knowledge-First Workflow Pattern (MANDATORY)
+
+The system enforces a **knowledge-first pattern** for all ERPNext operations to ensure accuracy and prevent errors.
+
+**Required Workflow:**
+
+```
+User Request → Search Knowledge → Review Information → Execute Operation → Success
+```
+
+**Step-by-Step:**
+
+1. **User requests ERPNext operation** (create, update, delete, workflow action)
+2. **LLM ALWAYS searches knowledge first**:
+   - Searches for schemas to understand required/optional fields
+   - Searches for workflows to understand proper sequences
+   - Searches for best practices to avoid common mistakes
+3. **LLM reviews retrieved knowledge**:
+   - Identifies all required fields and their formats
+   - Understands validation rules and constraints
+   - Learns proper workflow steps and sequences
+4. **LLM calls MCP tools** with complete, accurate parameters based on knowledge
+5. **Operation succeeds** on first attempt with correct data
+
+**Example Flow:**
+
+**User**: "Create a Sales Order for customer ABC Corp with item ITEM-001, quantity 10"
+
+**LLM Workflow**:
+```
+1. Search: search_erpnext_knowledge("Sales Order required fields create workflow",
+                                     content_types="schema,workflow",
+                                     doctype="Sales Order")
+
+2. Review: Retrieved knowledge shows required fields:
+   - customer (mandatory)
+   - transaction_date (mandatory)
+   - items (mandatory, with child fields: item_code, qty, rate)
+   - delivery_date (mandatory)
+   - etc.
+
+3. Execute: Call MCP tool with ALL required fields populated correctly
+
+4. Success: Sales Order created without errors
+```
+
+**Why This Matters:**
+
+- ❌ **Without knowledge search**: LLM guesses field names → missing required fields → operation fails → retry loop
+- ✅ **With knowledge search**: LLM knows exact requirements → provides complete data → operation succeeds immediately
+
+**Prevented Issues:**
+- Missing required fields causing validation errors
+- Incorrect field names or data types
+- Wrong workflow sequences
+- Business rule violations
+- Duplicate work and user frustration
+
+**When Tools Are Called:**
+
+**MANDATORY (Knowledge search BEFORE operations):**
+- Before calling ANY MCP tool for ERPNext operations
+- Before creating or updating DocTypes
+- Before workflow operations (submit, cancel, amend)
+- Before complex multi-step operations
+
+**Also called for (User questions):**
+- User asks about ERPNext workflows ("How do I create X?")
+- User needs schema information ("What fields does X have?")
+- User requests best practices
+- User wants examples
+- Troubleshooting errors
+
+**Benefits Over Pre-Retrieval:**
+- ✅ **Knowledge-first pattern**: LLM searches BEFORE operations, preventing errors
+- ✅ **Higher accuracy**: Schema-informed operations with all required fields
+- ✅ **First-time success**: Operations succeed immediately without retries
+- ✅ LLM decides when knowledge is actually needed (reduces unnecessary searches)
+- ✅ Multi-turn refinement (can search multiple times with different queries)
+- ✅ Conditional retrieval (only searches for ERPNext-specific questions)
+- ✅ Flexible filtering (LLM chooses appropriate content types and filters)
+- ✅ Transparent to user (can see when knowledge is being retrieved)
+- ✅ Lower latency for simple questions that don't need knowledge base
+
+**Technical Details:**
+- Uses vector embeddings (1536-dimensional for Gemini) for semantic search
+- Similarity threshold: 0.7 (70% relevance minimum)
+- Tools registered with megamind_graph workflow
+- Read-only tools bypass user consent checks
+- Gracefully handles Titan service failures
 
 ### Static Prompts (prompts.py)
 
-For graphs not using the dynamic prompt system, static prompt templates are defined in `src/megamind/prompts.py`:
+For specialized graph workflows, static prompt templates are defined in `src/megamind/prompts.py`:
 - `wiki_agent_instructions` / `document_agent_instructions`: Used by minion endpoints
 - `content_agent_instructions`: Used by content refinement node in megamind_graph
 - Role generation prompts: `find_related_role_instructions`, `role_generation_agent_instructions`, `permission_description_agent_instructions`
@@ -106,8 +214,8 @@ These are simpler string templates with `{company}` and other placeholders forma
 
 **Main router** (`main.py`):
 - Defines most endpoints directly in the main FastAPI app
-- Uses `_handle_chat_stream()` helper for endpoints sharing megamind_graph
-- Differentiates requests by `prompt_family` parameter
+- Uses `_handle_chat_stream()` helper for main chat endpoint with RAG integration
+- Single generic endpoint serves all use cases via dynamic knowledge retrieval
 
 **Minion router** (`api/v1/minion.py`):
 - Separate APIRouter for wiki/document search
@@ -124,6 +232,13 @@ Uses **AsyncPostgresSaver** for checkpoint persistence:
 - Cookie-based authentication is passed through graph state for ERPNext/Frappe client calls
 
 ### External Service Integration
+
+**Titan (ERPNext Knowledge Base):**
+- `src/megamind/clients/titan_client.py`: HTTP client for Titan API
+- Provides ERPNext knowledge search and embedding generation
+- Configuration: `TITAN_API_URL` in `.env` (default: http://localhost:8001)
+- Used by RAG service for semantic knowledge retrieval
+- Endpoints: `/api/v1/erpnext-knowledge/search`, `/api/v1/erpnext-knowledge/{id}`, etc.
 
 **Frappe/ERPNext:**
 - `src/megamind/clients/frappe_client.py`: HTTP client for ERPNext API
@@ -188,34 +303,49 @@ Settings loaded via `src/megamind/utils/config.py` using pydantic-settings.
 
 ### Modifying Prompts
 
-**For dynamic prompts** (used by megamind_graph endpoints):
-1. Add/modify components in `src/megamind/dynamic_prompts/components/`
-2. Create/update YAML variant in `src/megamind/dynamic_prompts/variants/`
-3. Test with `python tests/test_prompt_builder.py --variant your_variant`
-4. Use variant by passing correct `prompt_family` in endpoint handler's `_handle_chat_stream()` call
+**For tool-based knowledge retrieval** (used by main chat endpoint):
+1. **Base prompt**: Edit `src/megamind/base_prompt.py` to:
+   - Modify core agent behavior and identity
+   - Adjust instructions on when to use knowledge search tools
+   - Add/remove examples of tool usage
+   - Change tool calling strategy
+2. **Knowledge tools**: Modify `src/megamind/graph/tools/titan_knowledge_tools.py` to:
+   - Adjust tool descriptions (affects when LLM calls them)
+   - Change result formatting
+   - Modify search parameters or filtering logic
+3. **Knowledge content**: Add/update knowledge entries in Titan service (external to this repo)
+4. Test by sending queries to `/api/v1/stream/{thread}` and observing when LLM calls knowledge tools
 
-**For static prompts** (used by other graphs):
+**For static prompts** (used by specialized graphs):
 1. Edit the prompt string in `src/megamind/prompts.py`
 2. Use `.format()` placeholders like `{company}` for runtime values
 3. Reference the prompt in the graph's node or endpoint handler
 
 ### Adding Tools
 
-1. Define tool functions in `src/megamind/graph/tools/`
-2. Register tools with agent nodes or ToolNodes in graph definitions
-3. Tools receive state and can access `cookie` for authenticated API calls
+1. Define tool functions in `src/megamind/graph/tools/` using `@tool` decorator
+2. Import tools in `src/megamind/graph/nodes/megamind_agent.py` and add to tools list
+3. Import tools in `src/megamind/graph/workflows/megamind_graph.py` and add to ToolNode
+4. Tools receive arguments from LLM and return string results
+5. Update routing logic if tool requires user consent (see `route_tools_from_rag`)
+
+**Example** (Titan knowledge tools):
+- Defined in `src/megamind/graph/tools/titan_knowledge_tools.py`
+- Registered in megamind_agent_node (combined with MCP tools)
+- Added to ToolNode in megamind_graph workflow
+- Bypass consent checks (read-only operations)
 
 ### Adding New API Endpoints
 
 **When to use which approach:**
-- **Main.py endpoints**: Simple endpoints, or endpoints that need to share megamind_graph with different prompt families
+- **Main.py endpoints**: Simple endpoints that can reuse existing graph workflows
 - **Separate router**: Feature with multiple related endpoints, or endpoints with significant business logic (recommended for maintainability)
 
 #### Option A: Add Endpoint in main.py
 
 **For streaming LangGraph endpoints:**
 1. Define endpoint with `@app.post("/api/v1/your-endpoint/stream/{thread}")`
-2. Use `_handle_chat_stream()` if using megamind_graph with a new prompt family
+2. Use `_handle_chat_stream()` if using megamind_graph with RAG (already handles knowledge retrieval)
 3. Create corresponding request model in `src/megamind/models/requests.py` if needed
 4. Return responses via `stream_response_with_ping()`
 
@@ -457,8 +587,21 @@ app.include_router(
 
 1. Request hits endpoint → extracts `thread` from path, `cookie` from headers
 2. Retrieve graph from `app.state` and build config with `thread_id`
-3. Check if new thread: if so, build system prompt using prompt_registry
+3. Check if new thread: if so, build system prompt:
+   - Get runtime values (company, datetime) from ERPNext
+   - Build base prompt with knowledge-first workflow instructions
 4. Handle interruptions (if `interrupt_response` provided in request)
 5. Add user message and invoke graph with streaming via `stream_response_with_ping()`
-6. Graph executes nodes, calls tools, updates checkpointer state
+6. Graph executes nodes with **knowledge-first pattern**:
+   - `megamind_agent_node`: LLM receives user request for ERPNext operation
+   - **FIRST**: LLM calls `search_erpnext_knowledge` to retrieve schemas, workflows, best practices
+   - LLM reviews retrieved knowledge for required fields, validation rules, workflow steps
+   - **THEN**: LLM calls MCP tools with complete, accurate parameters based on knowledge
+   - `mcp_tools` ToolNode: Executes tool calls and returns results
+   - LLM uses tool results to formulate response
+   - Can loop multiple times for multi-step operations (search → execute → search → execute)
 7. Stream events back to client as Server-Sent Events (SSE)
+8. User sees tool calls in real-time:
+   - Knowledge search happening first
+   - Operation execution with informed parameters
+   - Success on first attempt

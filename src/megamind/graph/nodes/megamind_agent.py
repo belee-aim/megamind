@@ -4,6 +4,10 @@ from loguru import logger
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
+from megamind.graph.tools.titan_knowledge_tools import (
+    search_erpnext_knowledge,
+    get_erpnext_knowledge_by_id,
+)
 
 from ..states import AgentState
 
@@ -77,9 +81,14 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
 
     llm = configurable.get_chat_model()
     mcp_tools = await mcp_client.get_tools()
-    response = await llm.bind_tools(mcp_tools).ainvoke(messages)
 
-    # Add access token to tool call args if present
+    # Add Titan knowledge search tools
+    titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
+    all_tools = mcp_tools + titan_tools
+
+    response = await llm.bind_tools(all_tools).ainvoke(messages)
+
+    # Add access token to tool call args if present (only for MCP tools)
     if response.tool_calls:
         access_token = state.get("access_token")
         for tool_call in response.tool_calls:

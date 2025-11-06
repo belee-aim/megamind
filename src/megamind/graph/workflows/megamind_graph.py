@@ -8,6 +8,10 @@ from megamind.graph.nodes.human_in_the_loop import user_consent_node
 from megamind.graph.nodes.megamind_agent import megamind_agent_node
 from megamind.graph.states import AgentState
 from megamind.graph.nodes.content_agent import content_agent_node
+from megamind.graph.tools.titan_knowledge_tools import (
+    search_erpnext_knowledge,
+    get_erpnext_knowledge_by_id,
+)
 
 interrupt_keywords = [
     "create",
@@ -20,6 +24,7 @@ interrupt_keywords = [
 def route_tools_from_rag(state: AgentState) -> str:
     """
     Routes to the appropriate tool node based on the agent's decision.
+    Titan knowledge search tools bypass consent checks (read-only).
     """
     if (
         "messages" not in state
@@ -33,6 +38,12 @@ def route_tools_from_rag(state: AgentState) -> str:
         return END
 
     tool_name = last_message.tool_calls[0]["name"]
+
+    # Titan knowledge tools are read-only, bypass consent
+    if tool_name in ["search_erpnext_knowledge", "get_erpnext_knowledge_by_id"]:
+        return "mcp_tools"
+
+    # Check if MCP tool requires consent
     if any(keyword in tool_name.lower() for keyword in interrupt_keywords):
         return "user_consent_node"
 
@@ -59,8 +70,13 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
 
     # Add nodes
     workflow.add_node("megamind_agent_node", megamind_agent_node)
-    tools = await mcp_client.get_tools()
-    workflow.add_node("mcp_tools", ToolNode(tools))
+
+    # Combine MCP tools with Titan knowledge search tools
+    mcp_tools = await mcp_client.get_tools()
+    titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
+    all_tools = mcp_tools + titan_tools
+
+    workflow.add_node("mcp_tools", ToolNode(all_tools))
     workflow.add_node("content_agent", content_agent_node)
     workflow.add_node("user_consent_node", user_consent_node)
 

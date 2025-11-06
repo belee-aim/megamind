@@ -15,9 +15,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
 
+from megamind.base_prompt import build_system_prompt
 from megamind.clients.frappe_client import FrappeClient
-from megamind.dynamic_prompts.core.models import SystemContext, ProviderInfo
-from megamind.dynamic_prompts.core.registry import prompt_registry
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.megamind_graph import build_megamind_graph
 from megamind.graph.workflows.role_generation_graph import (
@@ -77,14 +76,10 @@ async def lifespan(app: FastAPI):
         app.state.wiki_graph = wiki_graph
         app.state.document_search_graph = document_search_graph
 
-        # Load the prompt registry on startup
-        logger.info("Loading prompt registry")
-        await prompt_registry.load()
-        logger.info("Prompt registry loaded successfully")
-
         logger.info("Application startup completed successfully")
         yield
         logger.info("Application shutdown initiated")
+
 
 if settings.sentry_dsn:
     sentry_sdk.init(
@@ -93,7 +88,9 @@ if settings.sentry_dsn:
         traces_sample_rate=settings.sentry_traces_sample_rate,
         environment=settings.environment,
     )
-    logger.info(f"Sentry initialized successfully (environment={settings.environment}, traces_sample_rate={settings.sentry_traces_sample_rate})")
+    logger.info(
+        f"Sentry initialized successfully (environment={settings.environment}, traces_sample_rate={settings.sentry_traces_sample_rate})"
+    )
 else:
     logger.info("Sentry DSN not configured, skipping Sentry initialization")
 
@@ -156,14 +153,12 @@ async def _handle_chat_stream(
     request: Request,
     request_data: ChatRequest,
     thread: str,
-    prompt_family: str,
 ):
     """
     Handles the common logic for streaming chat responses.
+    Knowledge retrieval is now handled by the LLM via tools.
     """
-    logger.info(
-        f"Handling chat stream for thread={thread}, prompt_family={prompt_family}"
-    )
+    logger.info(f"Handling chat stream for thread={thread}")
 
     if not thread:
         raise HTTPException(status_code=400, detail="Thread parameter is required")
@@ -179,27 +174,23 @@ async def _handle_chat_stream(
 
         # Initialize system prompt if it's a new thread
         if thread_state is None:
-            logger.debug(
-                f"Initializing new thread: {thread} with prompt_family: {prompt_family}"
-            )
-            frappe_client = FrappeClient(access_token=access_token)
-            runtime_placeholders = {}
-            runtime_placeholders["company"] = frappe_client.get_default_company()
-            runtime_placeholders["current_datetime"] = datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S %Z"
-            )
-            logger.debug(f"Using company: {runtime_placeholders['company']}")
-            logger.debug(
-                f"Current datetime: {runtime_placeholders['current_datetime']}"
-            )
+            logger.debug(f"Initializing new thread: {thread}")
 
-            context = SystemContext(
-                provider_info=ProviderInfo(family=prompt_family),
-                runtime_placeholders=runtime_placeholders,
+            # Get runtime values
+            frappe_client = FrappeClient(access_token=access_token)
+            company = frappe_client.get_default_company()
+            current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+
+            logger.debug(f"Using company: {company}")
+            logger.debug(f"Current datetime: {current_datetime}")
+
+            # Build system prompt (knowledge will be retrieved by LLM via tools)
+            system_prompt = build_system_prompt(
+                company=company,
+                current_datetime=current_datetime,
             )
-            system_prompt = await prompt_registry.get(context)
             messages.append(SystemMessage(content=system_prompt))
-            logger.debug(f"System prompt loaded for thread: {thread}")
+            logger.debug(f"System prompt built for thread: {thread}")
         else:
             logger.debug(f"Continuing existing thread: {thread}")
 
@@ -238,10 +229,10 @@ async def _handle_chat_stream(
         return await stream_response_with_ping(graph, inputs, config)
 
     except HTTPException as e:
-        logger.error(f"HTTP error in chat stream for {prompt_family}: {e}")
+        logger.error(f"HTTP error in chat stream: {e}")
         raise e
     except Exception as e:
-        logger.error(f"Unexpected error in chat stream for {prompt_family}: {e}")
+        logger.error(f"Unexpected error in chat stream: {e}")
         raise HTTPException(
             status_code=500, detail=f"An unexpected error occurred: {str(e)}"
         )
@@ -254,41 +245,11 @@ async def stream(
     thread: str = None,
 ):
     """
-    Endpoint to chat with AI models.
-    Streams the response from the AI model.
+    Endpoint to chat with Aimlink AI assistant.
+    Streams the response from the AI model with RAG-augmented knowledge.
     """
-    logger.info(f"Generic chat endpoint called: thread={thread}")
-    return await _handle_chat_stream(request, request_data, thread, "generic")
-
-
-@app.post("/api/v1/accounting-finance/stream/{thread}")
-async def accounting_finance(
-    request: Request,
-    request_data: ChatRequest,
-    thread: str = None,
-):
-    """
-    Endpoint to chat with Accounting and Finance AI Agent.
-    Streams the response from the AI model.
-    """
-    logger.info(f"Accounting & Finance endpoint called: thread={thread}")
-    return await _handle_chat_stream(
-        request, request_data, thread, "accounting_finance"
-    )
-
-
-@app.post("/api/v1/stock-movement/stream/{thread}")
-async def stock_movement(
-    request: Request,
-    request_data: ChatRequest,
-    thread: str = None,
-):
-    """
-    Endpoint to chat with Stock movement AI Agent.
-    Streams the response from the AI model.
-    """
-    logger.info(f"Stock Movement endpoint called: thread={thread}")
-    return await _handle_chat_stream(request, request_data, thread, "stock_movement")
+    logger.info(f"Chat endpoint called: thread={thread}")
+    return await _handle_chat_stream(request, request_data, thread)
 
 
 @app.post("/api/v1/reconciliation/merge")

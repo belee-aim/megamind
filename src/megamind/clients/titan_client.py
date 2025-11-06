@@ -1,6 +1,8 @@
 import httpx
 from loguru import logger
+from typing import List, Dict, Optional
 
+from megamind.configuration import Configuration
 from megamind.models.requests import DocumentRequestBody
 from megamind.utils.config import settings
 
@@ -56,3 +58,136 @@ class TitanClient:
 
             logger.info(f"Titan processing job created: {job_id}")
             return job_id
+
+    async def search_knowledge(
+        self,
+        query: str,
+        content_types: Optional[List[str]] = None,
+        doctype_filter: Optional[str] = None,
+        operation_filter: Optional[str] = None,
+        complexity_filter: Optional[str] = None,
+        match_count: int = 5,
+        similarity_threshold: float = 0.7,
+    ) -> List[Dict]:
+        """
+        Search ERPNext knowledge using semantic similarity.
+
+        Args:
+            query: Natural language query to search for
+            content_types: Optional list of content types to filter
+                         (workflow, best_practice, schema, example, error_pattern, etc.)
+            doctype_filter: Optional DocType name to filter by
+            operation_filter: Optional operation type (create, read, update, delete, workflow, search)
+            complexity_filter: Optional complexity level (basic, intermediate, advanced)
+            match_count: Number of results to return (default: 5)
+            similarity_threshold: Minimum similarity score 0-1 (default: 0.7)
+
+        Returns:
+            List of knowledge entries with similarity scores
+
+        Raises:
+            httpx.HTTPError: If the request to Titan fails
+        """
+        logger.info(f"Searching Titan knowledge: '{query[:100]}...'")
+
+        # Build request payload
+        payload = {
+            "query": query,
+            "match_count": match_count,
+            "similarity_threshold": similarity_threshold,
+        }
+
+        if content_types:
+            payload["content_types"] = content_types
+        if doctype_filter:
+            payload["doctype_filter"] = doctype_filter
+        if operation_filter:
+            payload["operation_filter"] = operation_filter
+        if complexity_filter:
+            payload["complexity_filter"] = complexity_filter
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.api_url}/api/v1/erpnext-knowledge/search",
+                headers={"x-tenant-id": self.tenant_id},
+                json=payload,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            results = response.json()
+
+            logger.info(f"Found {len(results)} knowledge entries")
+            return results
+
+    async def get_knowledge_by_id(self, knowledge_id: int) -> Dict:
+        """
+        Get a specific ERPNext knowledge entry by ID.
+
+        Args:
+            knowledge_id: Knowledge entry ID
+
+        Returns:
+            Knowledge entry data
+
+        Raises:
+            httpx.HTTPError: If the request fails or knowledge not found
+        """
+        logger.debug(f"Fetching knowledge entry: {knowledge_id}")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.api_url}/api/v1/erpnext-knowledge/{knowledge_id}",
+                headers={"x-tenant-id": self.tenant_id},
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def list_knowledge(
+        self,
+        doctype: Optional[str] = None,
+        content_type: Optional[str] = None,
+        module: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Dict]:
+        """
+        List ERPNext knowledge entries with optional filtering.
+
+        Args:
+            doctype: Filter by DocType name
+            content_type: Filter by content type
+            module: Filter by ERPNext module
+            skip: Pagination offset (default: 0)
+            limit: Maximum number of results (default: 100)
+
+        Returns:
+            List of knowledge entries
+
+        Raises:
+            httpx.HTTPError: If the request fails
+        """
+        logger.debug(
+            f"Listing knowledge entries (doctype={doctype}, content_type={content_type})"
+        )
+
+        params = {"skip": skip, "limit": limit}
+        if doctype:
+            params["doctype"] = doctype
+        elif content_type:
+            params["content_type"] = content_type
+        elif module:
+            params["module"] = module
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.api_url}/api/v1/erpnext-knowledge",
+                headers={"x-tenant-id": self.tenant_id},
+                params=params,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            results = response.json()
+
+            logger.info(f"Retrieved {len(results)} knowledge entries")
+            return results
