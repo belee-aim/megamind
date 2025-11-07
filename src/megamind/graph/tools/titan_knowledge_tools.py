@@ -15,9 +15,7 @@ from megamind.clients.titan_client import TitanClient
 @tool
 async def search_erpnext_knowledge(
     query: str,
-    content_types: Optional[str] = None,
     doctype: Optional[str] = None,
-    operation: Optional[str] = None,
     match_count: int = 5,
 ) -> str:
     """
@@ -42,47 +40,37 @@ async def search_erpnext_knowledge(
 
     **Parameters:**
     - query: Natural language search query describing what you need
-    - content_types: Optional comma-separated list to filter by type. Options: workflow, best_practice, schema, example, error_pattern, relationship, process
     - doctype: Optional DocType name to filter results (e.g., "Sales Order", "Payment Entry")
-    - operation: Optional operation type to filter. Options: create, read, update, delete, workflow, search
     - match_count: Number of results to return (default: 5, max recommended: 10)
 
     **Examples:**
 
     **Before operations (MANDATORY pattern):**
-    - search_erpnext_knowledge("Sales Order required fields create workflow", content_types="schema,workflow", doctype="Sales Order")
-    - search_erpnext_knowledge("Payment Entry required fields and validation", content_types="schema,best_practice", doctype="Payment Entry")
-    - search_erpnext_knowledge("submit Purchase Invoice workflow steps", content_types="workflow", doctype="Purchase Invoice")
+    - search_erpnext_knowledge("Sales Order required fields create workflow", doctype="Sales Order")
+    - search_erpnext_knowledge("Payment Entry required fields and validation", doctype="Payment Entry")
+    - search_erpnext_knowledge("submit Purchase Invoice workflow steps", doctype="Purchase Invoice")
 
     **For user questions:**
-    - search_erpnext_knowledge("How to create sales order", content_types="workflow", doctype="Sales Order")
-    - search_erpnext_knowledge("Stock reconciliation process", content_types="workflow,example")
-    - search_erpnext_knowledge("Fixing 'Insufficient stock' error", content_types="error_pattern")
+    - search_erpnext_knowledge("How to create sales order", doctype="Sales Order")
+    - search_erpnext_knowledge("Stock reconciliation process")
+    - search_erpnext_knowledge("Fixing 'Insufficient stock' error")
 
     **Returns:**
-    Formatted knowledge entries with titles, types, relevance scores, and full content.
+    Formatted knowledge entries with titles, relevance scores, and full content.
 
     **IMPORTANT:** Review the returned schemas and workflows carefully before calling MCP tools.
     Do NOT skip this step - it prevents errors and ensures successful operations.
     """
-    logger.info(f"Tool called: search_erpnext_knowledge(query='{query[:50]}...', content_types={content_types}, doctype={doctype})")
+    logger.info(f"Tool called: search_erpnext_knowledge(query='{query[:50]}...', doctype={doctype})")
 
     try:
         # Create Titan client
         titan_client = TitanClient()
 
-        # Parse content_types if provided
-        types_list = None
-        if content_types:
-            types_list = [t.strip() for t in content_types.split(",")]
-            logger.debug(f"Filtering by content types: {types_list}")
-
         # Search knowledge
         results = await titan_client.search_knowledge(
             query=query,
-            content_types=types_list,
             doctype_filter=doctype,
-            operation_filter=operation,
             match_count=match_count,
             similarity_threshold=0.7,
         )
@@ -96,21 +84,16 @@ async def search_erpnext_knowledge(
 
         for i, entry in enumerate(results, 1):
             title = entry.get("title", "Untitled")
-            content_type = entry.get("content_type", "general")
             content = entry.get("content", "")
             summary = entry.get("summary", "")
             similarity = entry.get("similarity", 0)
             doctype_name = entry.get("doctype_name", "")
-            operation_type = entry.get("operation_type", "")
 
             # Build entry header
             formatted_parts.append(f"## {i}. {title}")
-            formatted_parts.append(f"**Type**: {content_type.replace('_', ' ').title()}")
 
             if doctype_name:
                 formatted_parts.append(f"**DocType**: {doctype_name}")
-            if operation_type:
-                formatted_parts.append(f"**Operation**: {operation_type.title()}")
 
             formatted_parts.append(f"**Relevance**: {similarity:.0%}\n")
 
@@ -160,13 +143,10 @@ async def get_erpnext_knowledge_by_id(knowledge_id: int) -> str:
         # Format entry
         formatted = [
             f"# {entry.get('title', 'Untitled')}",
-            f"\n**Type**: {entry.get('content_type', 'general').replace('_', ' ').title()}",
         ]
 
         if entry.get("doctype_name"):
-            formatted.append(f"**DocType**: {entry['doctype_name']}")
-        if entry.get("operation_type"):
-            formatted.append(f"**Operation**: {entry['operation_type'].title()}")
+            formatted.append(f"\n**DocType**: {entry['doctype_name']}")
         if entry.get("module"):
             formatted.append(f"**Module**: {entry['module']}")
 

@@ -31,7 +31,7 @@ User Request → search_knowledge → [search_process] → get_required_fields �
 ```
 User: "Create a Sales Order for ABC Corp"
 
-1. search_erpnext_knowledge("Sales Order schema workflow", content_types="schema,workflow", doctype="Sales Order")
+1. search_erpnext_knowledge("Sales Order schema workflow", doctype="Sales Order")
 2. get_required_fields(doctype="Sales Order")
 3. Review: Combine knowledge + required fields
 4. Execute: Create with all required fields
@@ -177,10 +177,9 @@ Tool call: delete_document(doctype='Sales Order', name='SO-00123')
 ## Tools
 
 **ERPNext Knowledge:**
-- `search_erpnext_knowledge(query, content_types, doctype, operation, match_count)`: Search knowledge base
-  - `content_types`: "workflow", "best_practice", "schema", "example", "error_pattern" (comma-separated)
+- `search_erpnext_knowledge(query, doctype, match_count)`: Search knowledge base
   - `doctype`: Filter by DocType
-  - `operation`: "create", "read", "update", "delete", "workflow"
+  - `match_count`: Number of results to return (default: 5)
 - `get_erpnext_knowledge_by_id(knowledge_id)`: Get specific knowledge entry
 
 **Required Fields (MANDATORY):**
