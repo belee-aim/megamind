@@ -206,3 +206,73 @@ class CompanyInformation(BaseModel):
                 if isinstance(loc, dict) and loc and "location_type" in loc
             ]
         return v
+
+
+class ProcessStepSchema(BaseModel):
+    """Schema for a single process step in a process definition."""
+
+    step_id: str = Field(description="Unique step identifier (e.g., 'verify_customer')")
+    title: str = Field(description="Step title")
+    description: str = Field(description="What to do in this step")
+    action_type: str = Field(
+        description="Type of action: validation, create_document, update_document, submit_document, workflow, search, etc."
+    )
+    target_doctype: Optional[str] = Field(
+        default=None, description="Target DocType if applicable (e.g., 'Sales Order')"
+    )
+    mcp_tool_name: Optional[str] = Field(
+        default=None,
+        description="MCP tool used for this step (e.g., 'create_document', 'get_document', 'list_documents')",
+    )
+
+
+class KnowledgeEntrySchema(BaseModel):
+    """Schema for extracted knowledge from conversations."""
+
+    knowledge_type: Literal[
+        "best_practice", "shortcut", "error_solution", "general_knowledge"
+    ] = Field(description="Type of knowledge being captured")
+    title: str = Field(description="Clear, descriptive title")
+    content: str = Field(description="Detailed content with context and explanation")
+    summary: str = Field(description="One-sentence summary")
+    possible_queries: List[str] = Field(
+        default_factory=list,
+        description="List of 3-5 possible search queries that would match this knowledge (different phrasings and question formats)",
+    )
+    doctype_name: Optional[str] = Field(
+        default=None, description="Related ERPNext DocType (e.g., 'Sales Order')"
+    )
+    module: Optional[str] = Field(
+        default=None, description="ERPNext module (e.g., 'Selling', 'Stock')"
+    )
+    category: Optional[str] = Field(
+        default=None,
+        description="Category for process definitions (e.g., 'Sales & Delivery')",
+    )
+    priority: int = Field(
+        default=70, ge=1, le=100, description="Priority level (1-100)"
+    )
+
+    # Only for best_practice/shortcut (will be saved as process definitions):
+    steps: Optional[Dict[str, ProcessStepSchema]] = Field(
+        default=None, description="Process steps for best practices and shortcuts"
+    )
+    trigger_conditions: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Conditions that trigger this process (e.g., {'doctype': 'Sales Order', 'status': 'Draft'})",
+    )
+    prerequisites: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Prerequisites for executing this process (e.g., {'required_roles': ['Sales User']})",
+    )
+
+
+class KnowledgeExtractionResult(BaseModel):
+    """Result of knowledge extraction from a conversation."""
+
+    should_save: bool = Field(
+        description="Whether the conversation contains valuable knowledge worth saving"
+    )
+    entries: List[KnowledgeEntrySchema] = Field(
+        default_factory=list, description="List of extracted knowledge entries"
+    )

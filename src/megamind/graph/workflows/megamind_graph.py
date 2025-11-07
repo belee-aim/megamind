@@ -7,7 +7,7 @@ from megamind.configuration import Configuration
 from megamind.graph.nodes.human_in_the_loop import user_consent_node
 from megamind.graph.nodes.megamind_agent import megamind_agent_node
 from megamind.graph.states import AgentState
-from megamind.graph.nodes.content_agent import content_agent_node
+from megamind.graph.nodes.knowledge_capture_node import knowledge_capture_node
 from megamind.graph.tools.titan_knowledge_tools import (
     search_erpnext_knowledge,
     get_erpnext_knowledge_by_id,
@@ -77,7 +77,7 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
     all_tools = mcp_tools + titan_tools
 
     workflow.add_node("mcp_tools", ToolNode(all_tools))
-    workflow.add_node("content_agent", content_agent_node)
+    workflow.add_node("knowledge_capture_node", knowledge_capture_node)
     workflow.add_node("user_consent_node", user_consent_node)
 
     # Set the entry point
@@ -89,7 +89,7 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
         {
             "mcp_tools": "mcp_tools",
             "user_consent_node": "user_consent_node",
-            END: "content_agent",
+            END: "knowledge_capture_node",
         },
     )
 
@@ -105,7 +105,7 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
 
     # Add edges
     workflow.add_edge("mcp_tools", "megamind_agent_node")
-    workflow.add_edge("content_agent", END)
+    workflow.add_edge("knowledge_capture_node", END)
 
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

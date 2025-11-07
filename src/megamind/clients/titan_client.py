@@ -174,3 +174,126 @@ class TitanClient:
 
             logger.info(f"Retrieved {len(results)} knowledge entries")
             return results
+
+    async def create_knowledge_entry(
+        self,
+        title: str,
+        content: str,
+        summary: str,
+        doctype_name: Optional[str] = None,
+        related_doctypes: Optional[List[str]] = None,
+        module: Optional[str] = None,
+        priority: int = 70,
+        meta_data: Optional[Dict] = None,
+        version: int = 1,
+    ) -> Dict:
+        """
+        Create a new ERPNext knowledge entry.
+
+        Args:
+            title: Title of the knowledge entry
+            content: Detailed content
+            summary: Brief summary
+            doctype_name: Related DocType name
+            related_doctypes: List of related DocTypes
+            module: ERPNext module
+            priority: Priority (1-100, default: 70)
+            meta_data: Additional metadata
+            version: Version number (default: 1)
+
+        Returns:
+            Created knowledge entry data
+
+        Raises:
+            httpx.HTTPError: If the request fails
+        """
+        logger.info(f"Creating knowledge entry: {title}")
+
+        payload = {
+            "title": title,
+            "content": content,
+            "summary": summary,
+            "priority": priority,
+            "version": version,
+        }
+
+        if doctype_name:
+            payload["doctype_name"] = doctype_name
+        if related_doctypes:
+            payload["related_doctypes"] = related_doctypes
+        if module:
+            payload["module"] = module
+        if meta_data:
+            payload["meta_data"] = meta_data
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.api_url}/api/v1/erpnext-knowledge",
+                headers={"x-tenant-id": self.tenant_id},
+                json=payload,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            logger.info(f"Knowledge entry created with ID: {result.get('id')}")
+            return result
+
+    async def create_process_definition(
+        self,
+        process_id: str,
+        name: str,
+        description: str,
+        category: str,
+        steps: Dict,
+        trigger_conditions: Optional[Dict] = None,
+        prerequisites: Optional[Dict] = None,
+        version: str = "1.0",
+    ) -> Dict:
+        """
+        Create a new process definition.
+
+        Args:
+            process_id: Unique process identifier
+            name: Process name
+            description: Process description
+            category: Process category
+            steps: Process steps dictionary
+            trigger_conditions: Optional trigger conditions
+            prerequisites: Optional prerequisites
+            version: Version string (default: "1.0")
+
+        Returns:
+            Created process definition data
+
+        Raises:
+            httpx.HTTPError: If the request fails
+        """
+        logger.info(f"Creating process definition: {process_id}")
+
+        payload = {
+            "process_id": process_id,
+            "name": name,
+            "description": description,
+            "category": category,
+            "steps": steps,
+            "version": version,
+        }
+
+        if trigger_conditions:
+            payload["trigger_conditions"] = trigger_conditions
+        if prerequisites:
+            payload["prerequisites"] = prerequisites
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.api_url}/api/v1/process-definitions",
+                headers={"x-tenant-id": self.tenant_id},
+                json=payload,
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            logger.info(f"Process definition created with ID: {result.get('id')}")
+            return result
