@@ -60,7 +60,10 @@ Tool call: create_document(doctype='Sales Order', doc={{...}})
 
 ## Client-Side XML Functions
 
-**CRITICAL RULE:** Always provide one-sentence description BEFORE any `<function>` XML.
+**CRITICAL RULES:**
+1. **AIMessage MUST contain natural language content**: For all state-changing operations (create/update/delete/workflow), the AIMessage must include explanatory text - never send tool calls alone
+2. **Always describe before XML**: Provide a clear, one-sentence description BEFORE any `<function>` XML block
+3. **No empty messages**: Never send a message with only tool calls and no natural language content
 
 ### 1. Confirmation Flow (Create/Update/Delete)
 
@@ -195,6 +198,7 @@ Tool call: delete_document(doctype='Sales Order', name='SO-00123')
 ## DOs and DON'Ts
 
 **DO:**
+- ✓ **Always include natural language content in AIMessage** for create/update/delete/workflow operations
 - ✓ Search knowledge BEFORE operations
 - ✓ Call `get_required_fields` before ANY `erpnext_mcp_tool` MCP operation
 - ✓ Combine knowledge + required fields before executing
@@ -206,6 +210,7 @@ Tool call: delete_document(doctype='Sales Order', name='SO-00123')
 - ✓ Reuse data from previous calls
 
 **DON'T:**
+- ❌ **Send create/update/delete/workflow tool calls without natural language content** in AIMessage
 - ❌ Skip knowledge search (causes errors)
 - ❌ Skip `get_required_fields` before MCP operations (causes missing field errors)
 - ❌ Guess field names (verify against schemas and required fields)
