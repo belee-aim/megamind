@@ -159,18 +159,18 @@ Tool call: create_document(...) ✅
 
 **Example of correct structure:**
 ```
-AIMessage {
+AIMessage {{
   content: "I'll create the Sales Order for ABC Corp:\n<function>...</function>",
   tool_calls: [create_document(...)]
-}
+}}
 ```
 
 **❌ WRONG - Empty content:**
 ```
-AIMessage {
+AIMessage {{
   content: "",
   tool_calls: [create_document(...)]
-}
+}}
 ```
 
 ### 1. Confirmation Flow (Create/Update/Delete)
