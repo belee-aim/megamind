@@ -252,6 +252,81 @@ async def stream(
     return await _handle_chat_stream(request, request_data, thread)
 
 
+@app.get("/api/v1/thread/{thread_id}/state")
+async def get_thread_state(
+    request: Request,
+    thread_id: str,
+):
+    """
+    Check if a thread is currently interrupted and waiting for user consent.
+
+    Returns:
+        - is_interrupted: True if waiting at user_consent_node
+        - waiting_at_node: Name of the node where execution is paused
+        - pending_tool_call: Details of the tool call awaiting consent
+        - thread_exists: Whether the thread exists
+    """
+    try:
+        logger.info(f"Thread state check called: thread_id={thread_id}")
+
+        graph: CompiledStateGraph = request.app.state.document_graph
+        config = RunnableConfig(configurable={"thread_id": thread_id})
+
+        # Get state snapshot from graph (not checkpointer)
+        state = await graph.aget_state(config)
+
+        # Check if thread exists
+        if state is None or state.values is None:
+            logger.debug(f"Thread {thread_id} not found")
+            return MainResponse(
+                message="Thread not found",
+                response={
+                    "is_interrupted": False,
+                    "waiting_at_node": None,
+                    "pending_tool_call": None,
+                    "thread_exists": False
+                }
+            ).model_dump()
+
+        # Check if interrupted at user_consent_node
+        is_interrupted = 'user_consent_node' in (state.next or ())
+        waiting_at_node = state.next[0] if state.next else None
+
+        # Extract pending tool call if interrupted
+        pending_tool_call = None
+        if is_interrupted and state.values.get("messages"):
+            last_message = state.values["messages"][-1]
+            if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+                tool_call = last_message.tool_calls[0]
+                pending_tool_call = {
+                    "id": tool_call.get("id"),
+                    "name": tool_call.get("name"),
+                    "args": tool_call.get("args")
+                }
+
+        logger.debug(f"Thread {thread_id} state: interrupted={is_interrupted}, node={waiting_at_node}")
+
+        return MainResponse(
+            message="Success",
+            response={
+                "is_interrupted": is_interrupted,
+                "waiting_at_node": waiting_at_node,
+                "pending_tool_call": pending_tool_call,
+                "thread_exists": True
+            }
+        ).model_dump()
+
+    except Exception as e:
+        logger.error(f"Error checking thread state for {thread_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=MainResponse(
+                message="Error",
+                error=f"Failed to check thread state: {str(e)}"
+            ).model_dump()
+        )
+
+
 @app.post("/api/v1/reconciliation/merge")
 async def merge_api(
     formatted_bank_file: UploadFile = File(...),
