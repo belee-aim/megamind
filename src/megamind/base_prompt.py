@@ -148,10 +148,30 @@ Tool call: create_document(...) ✅
 
 ## Client-Side XML Functions
 
-**CRITICAL RULES:**
-1. **AIMessage MUST contain natural language content**: For all state-changing operations (create/update/delete/workflow), the AIMessage must include explanatory text - never send tool calls alone
+**CRITICAL RULES - AIMessage Structure:**
+
+1. **AIMessage.content MUST NOT be empty when making tool calls**:
+   - When making ANY tool call (read, create, update, delete, workflow), the AIMessage must have a `content` field with natural language explanation
+   - NEVER send tool calls alone without explanatory text in the message content
+   - This applies to ALL operations, especially state-changing ones (create/update/delete/workflow)
+
 2. **Always describe before XML**: Provide a clear, one-sentence description BEFORE any `<function>` XML block
-3. **No empty messages**: Never send a message with only tool calls and no natural language content
+
+**Example of correct structure:**
+```
+AIMessage {
+  content: "I'll create the Sales Order for ABC Corp:\n<function>...</function>",
+  tool_calls: [create_document(...)]
+}
+```
+
+**❌ WRONG - Empty content:**
+```
+AIMessage {
+  content: "",
+  tool_calls: [create_document(...)]
+}
+```
 
 ### 1. Confirmation Flow (Create/Update/Delete)
 
@@ -286,7 +306,7 @@ Tool call: delete_document(doctype='Sales Order', name='SO-00123')
 ## DOs and DON'Ts
 
 **DO:**
-- ✓ **Always include natural language content in AIMessage** for create/update/delete/workflow operations
+- ✓ **Always populate AIMessage.content with natural language explanation** when making tool calls
 - ✓ Search knowledge BEFORE operations
 - ✓ Call `get_required_fields` before ANY `erpnext_mcp_tool` MCP operation
 - ✓ Combine knowledge + required fields before executing
@@ -298,14 +318,12 @@ Tool call: delete_document(doctype='Sales Order', name='SO-00123')
 - ✓ Reuse data from previous calls
 
 **DON'T:**
-- ❌ **Send create/update/delete/workflow tool calls without natural language content** in AIMessage
+- ❌ **Send tool calls with empty AIMessage.content** (always include natural language explanation)
 - ❌ Skip knowledge search (causes errors)
 - ❌ Skip `get_required_fields` before MCP operations (causes missing field errors)
 - ❌ Guess field names (verify against schemas and required fields)
 - ❌ Forget XML format for state-changing operations (breaks UI)
 - ❌ Output `<function>` XML without preceding natural language description
-- ❌ **Use `<expected_human_response>` without making a tool call** (triggers false interrupts and MALFORMED_FUNCTION_CALL errors)
-- ❌ Include `<expected_human_response>` when just explaining or discussing operations (only use when actually executing a tool)
 - ❌ Make redundant calls (don't fetch twice)
 
 ## Operational Constraints
