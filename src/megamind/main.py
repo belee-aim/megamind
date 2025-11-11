@@ -279,15 +279,17 @@ async def get_thread_state(
         # Check if thread exists
         if state is None or state.values is None:
             logger.debug(f"Thread {thread_id} not found")
-            return MainResponse(
-                message="Thread not found",
-                response={
-                    "is_interrupted": False,
-                    "waiting_at_node": None,
-                    "pending_tool_call": None,
-                    "thread_exists": False,
-                },
-            ).model_dump()
+            return JSONResponse(
+                content=MainResponse(
+                    message="Thread not found",
+                    response={
+                        "is_interrupted": False,
+                        "waiting_at_node": None,
+                        "pending_tool_call": None,
+                        "thread_exists": False,
+                    },
+                ).model_dump()
+            )
 
         # Check if interrupted at user_consent_node
         is_interrupted = "user_consent_node" in (state.next or ())
@@ -309,21 +311,23 @@ async def get_thread_state(
             f"Thread {thread_id} state: interrupted={is_interrupted}, node={waiting_at_node}"
         )
 
-        return MainResponse(
-            message="Success",
-            response={
-                "is_interrupted": is_interrupted,
-                "waiting_at_node": waiting_at_node,
-                "pending_tool_call": pending_tool_call,
-                "thread_exists": True,
-            },
-        ).model_dump()
+        return JSONResponse(
+            content=MainResponse(
+                message="Success",
+                response={
+                    "is_interrupted": is_interrupted,
+                    "waiting_at_node": waiting_at_node,
+                    "pending_tool_call": pending_tool_call,
+                    "thread_exists": True,
+                },
+            ).model_dump()
+        )
 
     except Exception as e:
         logger.error(f"Error checking thread state for {thread_id}: {e}")
-        raise HTTPException(
+        return JSONResponse(
             status_code=500,
-            detail=MainResponse(
+            content=MainResponse(
                 message="Error", error=f"Failed to check thread state: {str(e)}"
             ).model_dump(),
         )
