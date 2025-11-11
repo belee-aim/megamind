@@ -38,6 +38,7 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting application lifespan initialization")
+
     # build the graph
     async with AsyncPostgresSaver.from_conn_string(
         settings.supabase_connection_string
@@ -284,12 +285,12 @@ async def get_thread_state(
                     "is_interrupted": False,
                     "waiting_at_node": None,
                     "pending_tool_call": None,
-                    "thread_exists": False
-                }
+                    "thread_exists": False,
+                },
             ).model_dump()
 
         # Check if interrupted at user_consent_node
-        is_interrupted = 'user_consent_node' in (state.next or ())
+        is_interrupted = "user_consent_node" in (state.next or ())
         waiting_at_node = state.next[0] if state.next else None
 
         # Extract pending tool call if interrupted
@@ -301,10 +302,12 @@ async def get_thread_state(
                 pending_tool_call = {
                     "id": tool_call.get("id"),
                     "name": tool_call.get("name"),
-                    "args": tool_call.get("args")
+                    "args": tool_call.get("args"),
                 }
 
-        logger.debug(f"Thread {thread_id} state: interrupted={is_interrupted}, node={waiting_at_node}")
+        logger.debug(
+            f"Thread {thread_id} state: interrupted={is_interrupted}, node={waiting_at_node}"
+        )
 
         return MainResponse(
             message="Success",
@@ -312,8 +315,8 @@ async def get_thread_state(
                 "is_interrupted": is_interrupted,
                 "waiting_at_node": waiting_at_node,
                 "pending_tool_call": pending_tool_call,
-                "thread_exists": True
-            }
+                "thread_exists": True,
+            },
         ).model_dump()
 
     except Exception as e:
@@ -321,9 +324,8 @@ async def get_thread_state(
         raise HTTPException(
             status_code=500,
             detail=MainResponse(
-                message="Error",
-                error=f"Failed to check thread state: {str(e)}"
-            ).model_dump()
+                message="Error", error=f"Failed to check thread state: {str(e)}"
+            ).model_dump(),
         )
 
 

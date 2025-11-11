@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     sentry_traces_sample_rate: float = 1.0  # 1.0 = 100%, 0.1 = 10%
 
+    # Firebase Configuration
+    firebase_database_url: str = ""
+    firebase_credentials_base64: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

@@ -1,19 +1,28 @@
 from langgraph.types import interrupt
 from loguru import logger
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 
 from ..states import AgentState
+from megamind.clients.firebase_client import firebase_client
 
 
-def user_consent_node(state: AgentState) -> dict:
+async def user_consent_node(state: AgentState, config: RunnableConfig) -> dict:
     """
     Awaits user consent before proceeding with a create, update, or delete action.
     It interrupts the graph execution and expects a dictionary response from the client
     that conforms to the InterruptResponse schema.
     """
     logger.debug("---User consent node---")
+
+    # Extract thread_id from config
+    thread_id = config["configurable"]["thread_id"]
+
     last_message = state["messages"][-1]
     tool_call = last_message.tool_calls[0]
+
+    # Set Firebase interrupt state to TRUE (graph is now waiting for user consent)
+    await firebase_client.set_interrupt_state(thread_id, True)
 
     # Interrupt the graph to ask for user approval.
     response = interrupt(tool_call)
@@ -25,6 +34,8 @@ def user_consent_node(state: AgentState) -> dict:
 
         if response_type == "accept":
             # User approved, continue with the original tool call.
+            # Clear Firebase interrupt state (user has responded)
+            await firebase_client.set_interrupt_state(thread_id, False)
             return {"user_consent_response": "approved"}
 
         elif response_type == "edit":
@@ -40,6 +51,8 @@ def user_consent_node(state: AgentState) -> dict:
             )
             messages.append(new_ai_message)
 
+            # Clear Firebase interrupt state (user has responded with edits)
+            await firebase_client.set_interrupt_state(thread_id, False)
             return {"messages": messages, "user_consent_response": "approved"}
 
     # Default to denial for "deny", "response", or any other case.
@@ -49,4 +62,6 @@ def user_consent_node(state: AgentState) -> dict:
 
     messages = state["messages"] + [HumanMessage(content=denial_message)]
 
+    # Clear Firebase interrupt state (user has denied)
+    await firebase_client.set_interrupt_state(thread_id, False)
     return {"messages": messages, "user_consent_response": "denied"}
