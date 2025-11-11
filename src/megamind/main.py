@@ -104,7 +104,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://aimbe.aim.mn",
+        "https://link.aim.mn",
+        "http://localhost:3000",
+        "https://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
