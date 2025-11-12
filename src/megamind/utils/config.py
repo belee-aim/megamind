@@ -6,7 +6,7 @@ load_dotenv(override=True)
 
 class Settings(BaseSettings):
     # LLM Provider Configuration
-    provider: str = "GEMINI"  # GEMINI, DEEPSEEK, or CLAUDE
+    provider: str = "GEMINI"  # GEMINI, DEEPSEEK, CLAUDE, or KIMI
     api_key: str = ""  # Generic API key for the selected provider
     model: str = "gemini-2.5-flash"  # Model name for the selected provider
     embedding_model: str = "models/embedding-001"  # Embedding model name

@@ -35,9 +35,18 @@ def extract_text_content(content):
     return str(content)
 
 
-async def stream_response_with_ping(graph, inputs, config):
+async def stream_response_with_ping(graph, inputs, config, provider=None):
     """
     Streams responses from the graph with a ping mechanism to keep the connection alive.
+
+    All newline characters are replaced with |new_line| token for consistent formatting.
+    Empty chunks are also converted to |new_line| tokens to preserve formatting.
+
+    Args:
+        graph: LangGraph graph to stream from
+        inputs: Input data for the graph
+        config: Configuration for the graph
+        provider: Optional provider name (reserved for future provider-specific processing)
     """
     queue = asyncio.Queue()
 
@@ -47,8 +56,13 @@ async def stream_response_with_ping(graph, inputs, config):
                 if isinstance(chunk, AIMessage) and chunk.content:
                     # Extract text content, handling different provider formats
                     text_content = extract_text_content(chunk.content)
-                    if text_content:  # Only queue non-empty text
+                    if text_content:
+                        # Replace newlines with |new_line| token for all providers
+                        text_content = text_content.replace('\n', '|new_line|')
                         await queue.put(text_content)
+                    else:
+                        # Empty chunks become |new_line| token
+                        await queue.put('|new_line|')
         except Exception as e:
             logger.error(f"Error in stream producer: {e}")
             await queue.put(f"Error: {e}")

@@ -7,6 +7,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from megamind.models.requests import MinionRequest
 from megamind.utils.streaming import stream_response_with_ping
+from megamind.utils.config import settings
 from megamind import prompts
 from megamind.clients.frappe_client import FrappeClient
 
@@ -58,7 +59,9 @@ async def _handle_minion_stream(
 
     inputs = {"messages": messages}
 
-    return await stream_response_with_ping(graph, inputs, config)
+    return await stream_response_with_ping(
+        graph, inputs, config, provider=settings.provider
+    )
 
 
 @router.post("/wiki/stream/{thread_id}")

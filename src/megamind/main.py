@@ -212,7 +212,9 @@ async def _handle_chat_stream(
                     inputs = Command(
                         resume=request_data.interrupt_response.model_dump()
                     )
-                    return await stream_response_with_ping(graph, inputs, config)
+                    return await stream_response_with_ping(
+                        graph, inputs, config, provider=settings.provider
+                    )
 
             messages.append(
                 HumanMessage(
@@ -232,7 +234,9 @@ async def _handle_chat_stream(
         }
 
         logger.debug(f"Starting stream for thread: {thread}")
-        return await stream_response_with_ping(graph, inputs, config)
+        return await stream_response_with_ping(
+            graph, inputs, config, provider=settings.provider
+        )
 
     except HTTPException as e:
         logger.error(f"HTTP error in chat stream: {e}")
