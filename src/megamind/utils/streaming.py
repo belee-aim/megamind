@@ -27,9 +27,9 @@ def extract_text_content(content):
         # Claude format: list of content blocks
         text_parts = []
         for block in content:
-            if isinstance(block, dict) and block.get('type') == 'text':
-                text_parts.append(block.get('text', ''))
-        return ''.join(text_parts)
+            if isinstance(block, dict) and block.get("type") == "text":
+                text_parts.append(block.get("text", ""))
+        return "".join(text_parts)
 
     # Fallback for unknown formats
     return str(content)
@@ -58,11 +58,14 @@ async def stream_response_with_ping(graph, inputs, config, provider=None):
                     text_content = extract_text_content(chunk.content)
                     if text_content:
                         # Replace newlines with |new_line| token for all providers
-                        text_content = text_content.replace('\n', '|new_line|')
+                        text_content = text_content.replace("\n", "|new_line|")
+
+                        # Replace space with |space| token for all providers
+                        text_content = text_content.replace(" ", "|space|")
                         await queue.put(text_content)
                     else:
                         # Empty chunks become |new_line| token
-                        await queue.put('|new_line|')
+                        await queue.put("|new_line|")
         except Exception as e:
             logger.error(f"Error in stream producer: {e}")
             await queue.put(f"Error: {e}")
