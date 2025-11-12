@@ -1,7 +1,7 @@
 """
 LLM Factory for creating language model instances based on provider configuration.
 
-Supports multiple providers: GEMINI, DEEPSEEK, and CLAUDE
+Supports multiple providers: GEMINI, DEEPSEEK, CLAUDE, and KIMI
 Uses Factory design pattern for flexible provider switching via environment variables.
 """
 
@@ -147,17 +147,58 @@ class ClaudeProvider(LLMProvider):
         )
 
 
+class KimiProvider(LLMProvider):
+    """Moonshot KIMI provider implementation (OpenAI-compatible)."""
+
+    def create_chat_model(
+        self, model: str, api_key: str, **kwargs
+    ) -> BaseChatModel:
+        from langchain_openai import ChatOpenAI
+
+        logger.debug(f"Creating KIMI chat model: {model}")
+        return ChatOpenAI(
+            model=model,
+            api_key=api_key,
+            base_url="https://api.moonshot.ai/v1",
+            **kwargs,
+        )
+
+    def create_embeddings(
+        self, model: str, api_key: str, **kwargs
+    ) -> Embeddings:
+        # KIMI doesn't provide embedding models
+        logger.warning(
+            "KIMI does not provide embedding models. "
+            "Please use GEMINI or DEEPSEEK for embeddings, "
+            "or configure a separate embedding provider."
+        )
+        raise NotImplementedError(
+            "KIMI does not provide embedding models. "
+            "Please set PROVIDER=GEMINI for embeddings or use a separate embedding service."
+        )
+
+    def get_default_model(self) -> str:
+        return "moonshotai/Kimi-K2-Thinking"
+
+    def get_default_embedding_model(self) -> str:
+        # KIMI doesn't have embeddings
+        raise NotImplementedError(
+            "KIMI does not provide embedding models. Use GEMINI or DEEPSEEK for embeddings."
+        )
+
+
 class LLMFactory:
     """
     Factory class for creating LLM instances based on provider configuration.
 
-    Supports GEMINI, DEEPSEEK, and CLAUDE providers.
+    Supports GEMINI, DEEPSEEK, CLAUDE, and KIMI providers.
     """
 
     _providers = {
         "GEMINI": GeminiProvider(),
         "DEEPSEEK": DeepSeekProvider(),
         "CLAUDE": ClaudeProvider(),
+        "KIMI": KimiProvider(),
     }
 
     @classmethod
