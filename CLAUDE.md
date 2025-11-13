@@ -273,7 +273,7 @@ Tool: ✅ Success! SO-00123 created
 **Testing:**
 - Comprehensive test suite in `tests/test_crag_integration.py`
 - 14 unit and integration tests covering error detection, query generation, retry logic
-- Run tests: `uv run pytest tests/test_crag_integration.py -v -k "asyncio"`
+- Run tests: `uv run pytest tests/test_crag_integration.py -v`
 
 
 ### Static Prompts (prompts.py)
