@@ -8,7 +8,6 @@ and re-retrieves information to help the agent recover from failures.
 import re
 from typing import Dict, Any
 from langchain_core.messages import ToolMessage, AIMessage, HumanMessage
-from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
@@ -233,7 +232,7 @@ async def _retrieve_corrective_knowledge(
         return ""
 
 
-async def corrective_rag_node(state: AgentState, _config: RunnableConfig) -> Dict[str, Any]:
+async def corrective_rag_node(state: AgentState) -> Dict[str, Any]:
     """
     CRAG Node: Analyzes tool execution results and provides corrective knowledge when errors are detected.
 
