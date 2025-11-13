@@ -15,7 +15,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
 
-from megamind.base_prompt import build_system_prompt
+from megamind.prompts import build_system_prompt
 from megamind.clients.frappe_client import FrappeClient
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.megamind_graph import build_megamind_graph

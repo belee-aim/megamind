@@ -2,22 +2,6 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 
-class ConversationSummary(BaseModel):
-    """
-    A summary of a conversation, including general content, key points, and structured data.
-    """
-
-    general_content: str = Field(
-        description="A brief, general summary of the conversation."
-    )
-    key_points: list[str] = Field(
-        description="A list of the most important points or takeaways from the conversation."
-    )
-    structured_data: dict = Field(
-        description="Any structured data that was extracted from the conversation, such as form data or API call arguments."
-    )
-
-
 class InterruptResponse(BaseModel):
     """
     Interrupt response format

@@ -36,11 +36,12 @@ This directory contains the definitions for the various `langgraph` workflows.
 This workflow is designed for general-purpose queries, including retrieval-augmented generation (RAG) and agentic tool use.
 
 -   **Nodes**:
-    -   `megamind_agent_node`: The entry point and primary node of the workflow. It can perform actions in the ERPNext system using the `erpnext_mcp_tool_agent`.
-    -   `content_agent_node`: A node that refines the content before sending the final response.
-    -   `erpnext_mcp_tool_agent`: A `ToolNode` for interacting with an ERPNext MCP server.
-    -   `process_and_embed`: Processes and creates embeddings for retrieved data.
--   **Flow**: The `megamind_agent_node` is the entry point. It can call tools in a loop, processing the results until it has enough information to generate a final response. The final response is then passed to the `content_agent` for refinement.
+    -   `megamind_agent_node`: The entry point and primary node of the workflow. It can perform actions in the ERPNext system using MCP tools.
+    -   `mcp_tools`: A `ToolNode` for interacting with an ERPNext MCP server.
+    -   `user_consent_node`: Handles user consent for state-changing operations.
+    -   `corrective_rag_node`: Provides error recovery using the CRAG pattern.
+    -   `knowledge_capture_node`: Captures valuable insights from conversations.
+-   **Flow**: The `megamind_agent_node` is the entry point. It can call MCP tools or request user consent in a loop, with corrective RAG for error recovery. Valuable knowledge is captured at the end of conversations.
 
 #### `stock_movement_graph.py`
 
@@ -108,8 +109,7 @@ This directory contains Pydantic data models for requests and responses:
 
 This file contains static prompt templates (strings) for various agents. These are older-style prompts used by specific endpoints:
 -   `wiki_agent_instructions` and `document_agent_instructions`: Used by minion endpoints
--   `content_agent_instructions`: Used by content refinement node
--   Role generation prompts: `find_related_role_instructions`, `role_generation_agent_instructions`, `permission_description_agent_instructions`
+-   Role generation prompts: `role_generation_agent_instructions`, `permission_description_agent_instructions`
 
 **Note**: The main chat endpoints (`/api/v1/stream`, `/api/v1/stock-movement/stream`, `/api/v1/accounting-finance/stream`) use the **dynamic prompt system** in `src/megamind/dynamic_prompts/` instead of these static prompts.
 
@@ -139,11 +139,12 @@ graph TD
 
     subgraph "Tool Calling Loop"
         C -- Call Tool? --> D{Yes};
-        D --> F[erpnext_mcp_tool_agent];
-        F --> C;
+        D --> F[mcp_tools/user_consent_node];
+        F --> G[corrective_rag_node];
+        G --> C;
     end
 
-    C -- Finish --> H[content_agent];
+    C -- Finish --> H[knowledge_capture_node];
     H --> I[End];
 ```
 

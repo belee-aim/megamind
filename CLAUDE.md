@@ -205,8 +205,7 @@ User Request → Search Knowledge → Review Information → Execute Operation �
 
 For specialized graph workflows, static prompt templates are defined in `src/megamind/prompts.py`:
 - `wiki_agent_instructions` / `document_agent_instructions`: Used by minion endpoints
-- `content_agent_instructions`: Used by content refinement node in megamind_graph
-- Role generation prompts: `find_related_role_instructions`, `role_generation_agent_instructions`, `permission_description_agent_instructions`
+- Role generation prompts: `role_generation_agent_instructions`, `permission_description_agent_instructions`
 
 These are simpler string templates with `{company}` and other placeholders formatted at runtime.
 
@@ -261,8 +260,8 @@ Uses **AsyncPostgresSaver** for checkpoint persistence:
 ### Graph Workflows
 
 **megamind_graph** (main.py:51, workflows/megamind_graph.py):
-- Entry: `megamind_agent_node` → can call `erpnext_mcp_tool_agent` in a loop
-- Exit: `content_agent` refines final response
+- Entry: `megamind_agent_node` → can call `mcp_tools` or `user_consent_node` in a loop
+- Includes: `corrective_rag_node` for error recovery and `knowledge_capture_node` for saving insights
 - Used for general queries, RAG, and tool-based actions
 
 **stock_movement_graph** (workflows/stock_movement_graph.py):

@@ -14,6 +14,7 @@ from loguru import logger
 from megamind.clients.titan_client import TitanClient
 from megamind.configuration import Configuration
 from megamind.graph.states import AgentState
+from megamind import prompts
 
 
 # Maximum correction attempts before giving up
@@ -109,37 +110,12 @@ async def _generate_corrective_query(
 
     context_str = "\n".join(recent_context)
 
-    prompt = f"""You are an expert at analyzing ERPNext errors and generating targeted knowledge search queries.
-
-# Context
-The user attempted an ERPNext operation that failed with an error.
-
-**Recent Conversation:**
-{context_str}
-
-**Failed Tool:** {tool_name}
-**DocType:** {doctype or "Unknown"}
-**Error Message:** {error_description}
-
-# Task
-Generate a precise knowledge search query that will retrieve information to fix this error.
-
-Focus on:
-1. Required fields that might be missing
-2. Validation rules that were violated
-3. Correct workflow sequences
-4. Field formats and data types
-5. Common pitfalls for this operation
-
-# Output Format
-Return ONLY the search query text, nothing else. Make it specific and actionable.
-
-# Examples
-- "Sales Order required fields and validation rules for creation"
-- "Payment Entry mandatory fields and workflow sequence"
-- "Stock Entry item table required child fields and formats"
-
-# Your Query:"""
+    prompt = prompts.corrective_query_generation_instructions.format(
+        context_str=context_str,
+        tool_name=tool_name,
+        doctype=doctype or "Unknown",
+        error_description=error_description,
+    )
 
     try:
         config = Configuration()
