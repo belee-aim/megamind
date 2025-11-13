@@ -6,6 +6,7 @@ from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.nodes.human_in_the_loop import user_consent_node
 from megamind.graph.nodes.megamind_agent import megamind_agent_node
+from megamind.graph.nodes.corrective_rag_node import corrective_rag_node
 from megamind.graph.states import AgentState
 from megamind.graph.nodes.knowledge_capture_node import knowledge_capture_node
 from megamind.graph.tools.titan_knowledge_tools import (
@@ -77,6 +78,7 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
     all_tools = mcp_tools + titan_tools
 
     workflow.add_node("mcp_tools", ToolNode(all_tools))
+    workflow.add_node("corrective_rag_node", corrective_rag_node)
     workflow.add_node("knowledge_capture_node", knowledge_capture_node)
     workflow.add_node("user_consent_node", user_consent_node)
 
@@ -103,8 +105,9 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
         },
     )
 
-    # Add edges
-    workflow.add_edge("mcp_tools", "megamind_agent_node")
+    # CRAG: Route tool results through corrective analysis before returning to agent
+    workflow.add_edge("mcp_tools", "corrective_rag_node")
+    workflow.add_edge("corrective_rag_node", "megamind_agent_node")
     workflow.add_edge("knowledge_capture_node", END)
 
     # Compile the graph

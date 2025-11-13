@@ -13,6 +13,11 @@ class AgentState(TypedDict):
     workflow_state: Dict[str, Any] | None
     performance_metrics: Dict[str, Any] | None
 
+    # CRAG (Corrective RAG) state fields
+    correction_attempts: int | None
+    last_error_context: Dict[str, Any] | None
+    is_correction_mode: bool | None
+
 
 class StockMovementState(TypedDict):
     """
