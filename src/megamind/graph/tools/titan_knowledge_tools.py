@@ -77,10 +77,10 @@ async def search_erpnext_knowledge(
 
         if not results:
             logger.info("No knowledge entries found")
-            return "No relevant knowledge found in the ERPNext knowledge base for this query. You may need to rely on your general ERPNext knowledge or ask the user for more specific information."
+            return "No relevant knowledge found in the knowledge base for this query. You may need to rely on your general knowledge or ask the user for more specific information."
 
         # Format results for LLM consumption
-        formatted_parts = [f"# ERPNext Knowledge Search Results ({len(results)} entries found)\n"]
+        formatted_parts = [f"# Knowledge Search Results ({len(results)} entries found)\n"]
 
         for i, entry in enumerate(results, 1):
             title = entry.get("title", "Untitled")
@@ -114,7 +114,7 @@ async def search_erpnext_knowledge(
 
     except Exception as e:
         logger.error(f"Error in search_erpnext_knowledge tool: {e}")
-        return f"Error searching knowledge base: {str(e)}. Continue with your general ERPNext knowledge."
+        return f"Error searching knowledge base: {str(e)}. Continue with your general knowledge."
 
 
 @tool

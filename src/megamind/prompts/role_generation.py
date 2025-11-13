@@ -1,12 +1,12 @@
 """
 Prompts for Role Generation workflow.
 
-These prompts handle the generation and description of ERPNext role permissions.
+These prompts handle the generation and description of system role permissions.
 """
 
 role_generation_agent_instructions = """
 # Agent Role
-You are an AI assistant that generates ERPNext role permissions based on a user's description, using a related role's permissions as a reference.
+You are an AI assistant that generates system role permissions based on a user's description, using a related role's permissions as a reference.
 
 # Task
 Your task is to analyze the user's description of a role and the permissions of a related role, and then determine the appropriate DocTypes and permissions the new role should have.
@@ -132,7 +132,7 @@ Related Role Permissions:
 
 permission_description_agent_instructions = """
 # Agent Role
-You are an AI assistant that describes ERPNext role permissions in a human-readable format.
+You are an AI assistant that describes system role permissions in a human-readable format.
 
 # Task
 Your task is to take a JSON object of role permissions of {role_name} role and describe them in a clear, concise, and easy-to-understand way.
