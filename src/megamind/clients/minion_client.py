@@ -23,6 +23,7 @@ class MinionClient:
                 f"{self.api_url}/api/v1/graphrag/search",
                 # headers={"x-graph-name": "role"},
                 json={"query": query},
+                timeout=30.0,
             )
             response.raise_for_status()
             return response.json()
@@ -36,6 +37,7 @@ class MinionClient:
                 f"{self.api_url}/api/v1/graphrag/search",
                 # headers={"x-graph-name": "document"},
                 json={"query": query},
+                timeout=30.0,
             )
             response.raise_for_status()
             return response.json()
@@ -49,6 +51,7 @@ class MinionClient:
                 f"{self.api_url}/api/v1/graphrag/search",
                 # headers={"x-graph-name": "wiki"},
                 json={"query": query},
+                timeout=30.0,
             )
             response.raise_for_status()
             return response.json()
