@@ -2,7 +2,6 @@ import httpx
 from loguru import logger
 
 
-
 class MinionClient:
     """
     A client for interacting with the Minion service.
@@ -21,8 +20,8 @@ class MinionClient:
         """
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{self.api_url}/api/v1/graphiti/search",
-                headers={"x-graph-name": "role"},
+                f"{self.api_url}/api/v1/graphrag/search",
+                # headers={"x-graph-name": "role"},
                 json={"query": query},
             )
             response.raise_for_status()
@@ -34,8 +33,8 @@ class MinionClient:
         """
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{self.api_url}/api/v1/graphiti/search",
-                headers={"x-graph-name": "document"},
+                f"{self.api_url}/api/v1/graphrag/search",
+                # headers={"x-graph-name": "document"},
                 json={"query": query},
             )
             response.raise_for_status()
@@ -47,8 +46,8 @@ class MinionClient:
         """
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{self.api_url}/api/v1/graphiti/search",
-                headers={"x-graph-name": "wiki"},
+                f"{self.api_url}/api/v1/graphrag/search",
+                # headers={"x-graph-name": "wiki"},
                 json={"query": query},
             )
             response.raise_for_status()
