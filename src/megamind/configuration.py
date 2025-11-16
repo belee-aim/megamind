@@ -23,6 +23,11 @@ class Configuration(BaseModel):
         description="The name of the language model to use for the agent's query generation.",
     )
 
+    fast_model: str = Field(
+        default="gemini-2.5-flash",
+        description="The name of the language model to use for fast but inaccurate agent.",
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None

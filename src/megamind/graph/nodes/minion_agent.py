@@ -1,10 +1,12 @@
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import AIMessage, ToolMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
 
 from megamind.configuration import Configuration
 from megamind.graph.states import AgentState
 from megamind.graph.tools.minion_tools import search_wiki, search_document
+from megamind.utils.config import settings
 
 
 def sanitize_messages_for_claude(messages: list) -> list:
@@ -20,7 +22,7 @@ def sanitize_messages_for_claude(messages: list) -> list:
     sanitized = []
 
     for i, msg in enumerate(messages):
-        if isinstance(msg, AIMessage) and hasattr(msg, 'tool_calls') and msg.tool_calls:
+        if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
             has_tool_results = False
 
             if i + 1 < len(messages):
@@ -36,7 +38,7 @@ def sanitize_messages_for_claude(messages: list) -> list:
                 )
                 clean_msg = AIMessage(
                     content=msg.content,
-                    id=msg.id if hasattr(msg, 'id') else None,
+                    id=msg.id if hasattr(msg, "id") else None,
                 )
                 sanitized.append(clean_msg)
         else:
@@ -51,12 +53,15 @@ async def wiki_agent_node(state: AgentState, config: RunnableConfig):
     """
     logger.debug("---WIKI AGENT NODE---")
     messages = state.get("messages", [])
-    configurable = Configuration.from_runnable_config(config)
+    configuration = Configuration()
 
     # Sanitize messages for Claude's strict tool call requirements
     messages = sanitize_messages_for_claude(messages)
 
-    llm = configurable.get_chat_model()
+    llm = ChatGoogleGenerativeAI(
+        model=configuration.fast_model,
+        google_api_key=settings.google_api_key,
+    )
     tools = [search_wiki]
     response = await llm.bind_tools(tools).ainvoke(messages)
 
@@ -69,12 +74,15 @@ async def document_agent_node(state: AgentState, config: RunnableConfig):
     """
     logger.debug("---DOCUMENT AGENT NODE---")
     messages = state.get("messages", [])
-    configurable = Configuration.from_runnable_config(config)
+    configuration = Configuration()
 
     # Sanitize messages for Claude's strict tool call requirements
     messages = sanitize_messages_for_claude(messages)
 
-    llm = configurable.get_chat_model()
+    llm = ChatGoogleGenerativeAI(
+        model=configuration.fast_model,
+        google_api_key=settings.google_api_key,
+    )
     tools = [search_document]
     response = await llm.bind_tools(tools).ainvoke(messages)
 
