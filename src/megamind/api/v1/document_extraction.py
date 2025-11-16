@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
+from langgraph.graph.state import CompiledStateGraph
 
 from megamind.clients.titan_client import TitanClient
-from megamind.graph.nodes.document_extraction_agent import extract_company_information
 from megamind.models.requests import (
     DocumentExtractionRequest,
     TitanCallbackRequest,
@@ -64,15 +64,32 @@ async def document_extraction_callback(
 ):
     """
     Callback endpoint for Titan service to send processed documents.
-    Extracts company information using LLM and returns structured data.
+    Extracts company information using the two-node LangGraph workflow:
+    1. extract_facts_node: Extracts only explicitly stated information
+    2. infer_values_node: Infers missing values based on hierarchy and context
     """
     try:
         logger.info(f"Received callback with {len(request_data.documents)} documents")
 
-        # Extract company information from documents
-        extracted_data = await extract_company_information(request_data.documents)
+        # Get the document extraction graph from app state
+        graph: CompiledStateGraph = request.app.state.document_extraction_graph
 
-        logger.info("Successfully extracted company information")
+        # Prepare inputs for the graph
+        inputs = {
+            "documents": request_data.documents,
+            "raw_extraction": None,
+            "final_extraction": None,
+        }
+
+        logger.info("Starting document extraction workflow")
+        # Invoke the graph to extract and enrich company information
+        final_state = await graph.ainvoke(inputs)
+        logger.info("Document extraction workflow completed successfully")
+
+        # Get the final extraction from the state
+        extracted_data = final_state.get("final_extraction")
+
+        logger.info("Successfully extracted and enriched company information")
 
         # Return the extracted data to Titan
         return MainResponse(

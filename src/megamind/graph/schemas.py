@@ -136,6 +136,93 @@ class Employee(BaseModel):
     )
 
 
+class RawEmployee(BaseModel):
+    """
+    Raw employee information extracted directly from documents.
+    Only includes explicitly stated information - no inference.
+    """
+
+    role: str = Field(description="Employee's role/position as stated in document")
+    firstname: str = Field(description="Employee's first name")
+    lastname: str = Field(description="Employee's last name")
+    email: Optional[str] = Field(
+        default=None,
+        description="Employee's email address (only if explicitly stated)",
+    )
+    reports_to: Optional[str] = Field(
+        default=None,
+        description="Email of person this employee reports to (only if explicitly stated, do not infer)",
+    )
+    gender: Optional[str] = Field(
+        default=None,
+        description="Gender of the employee (only if explicitly stated)",
+    )
+    date_of_joining: Optional[str] = Field(
+        default=None,
+        description="Date of joining the company (only if explicitly stated)",
+    )
+    date_of_birth: Optional[str] = Field(
+        default=None,
+        description="Date of birth (only if explicitly stated)",
+    )
+
+
+class RawCompanyInformation(BaseModel):
+    """
+    Raw company information extracted directly from documents.
+    Only includes explicitly stated information - no inference or enrichment.
+    All fields are optional - only extract if information is explicitly present.
+    """
+
+    company_profile: Optional[dict] = Field(
+        default={},
+        description="General company profile including name, industry, size, founding date, and overview. Only extract if explicitly stated.",
+    )
+    basic_information: Optional[dict] = Field(
+        default={},
+        description="Basic company information such as registration details, tax ID, headquarters address, contact information. Only extract if explicitly stated.",
+    )
+    mission: Optional[str] = Field(
+        default=None,
+        description="Company mission statement. Only extract if explicitly stated.",
+    )
+    vision: Optional[str] = Field(
+        default=None,
+        description="Company vision statement. Only extract if explicitly stated.",
+    )
+    company_policies: Optional[List[Policy]] = Field(
+        default=[],
+        description="List of company policies. Only extract if explicitly stated.",
+    )
+    office_retail_locations: Optional[
+        List[Annotated[Union[OfficeLocation, RetailStore], Field(discriminator="location_type")]]
+    ] = Field(
+        default=[],
+        description="List of office and retail locations. Only extract if explicitly stated with location_type.",
+    )
+    departments: Optional[List[Department]] = Field(
+        default=[],
+        description="List of unique departments mentioned in documents. Only extract if explicitly stated.",
+    )
+    employees: Optional[List[RawEmployee]] = Field(
+        default=[],
+        description="List of employees with their basic information. Only extract explicitly stated information - no inference.",
+    )
+
+    @field_validator("office_retail_locations", mode="before")
+    @classmethod
+    def filter_empty_locations(cls, v):
+        """Filter out empty dictionaries from office_retail_locations"""
+        if isinstance(v, list):
+            # Filter out empty dicts and dicts without required fields
+            return [
+                loc
+                for loc in v
+                if isinstance(loc, dict) and loc and "location_type" in loc
+            ]
+        return v
+
+
 class CompanyInformation(BaseModel):
     """
     Structured company information extracted from documents.

@@ -24,6 +24,9 @@ from megamind.graph.workflows.role_generation_graph import (
 )
 from megamind.graph.workflows.wiki_graph import build_wiki_graph
 from megamind.graph.workflows.document_search_graph import build_document_search_graph
+from megamind.graph.workflows.document_extraction_graph import (
+    build_document_extraction_graph,
+)
 from megamind.api.v1.minion import router as minion_router
 from megamind.api.v1.document_extraction import router as document_extraction_router
 from megamind.models.requests import ChatRequest, RoleGenerationRequest
@@ -69,6 +72,10 @@ async def lifespan(app: FastAPI):
         )
         logger.info("Document search graph built successfully")
 
+        logger.info("Building document extraction graph")
+        document_extraction_graph = await build_document_extraction_graph()
+        logger.info("Document extraction graph built successfully")
+
         app.state.checkpointer = checkpointer
 
         app.state.stock_movement_graph = document_graph
@@ -76,6 +83,7 @@ async def lifespan(app: FastAPI):
         app.state.role_generation_graph = role_generation_graph
         app.state.wiki_graph = wiki_graph
         app.state.document_search_graph = document_search_graph
+        app.state.document_extraction_graph = document_extraction_graph
 
         logger.info("Application startup completed successfully")
         yield

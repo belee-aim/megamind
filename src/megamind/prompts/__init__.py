@@ -30,7 +30,8 @@ from megamind.prompts.role_generation import (
 
 # Import from document_extraction module
 from megamind.prompts.document_extraction import (
-    document_extraction_agent_instructions,
+    fact_extraction_agent_instructions,
+    value_inference_agent_instructions,
 )
 
 # Import from corrective_rag module
@@ -55,7 +56,8 @@ __all__ = [
     "role_generation_agent_instructions",
     "permission_description_agent_instructions",
     # Document extraction
-    "document_extraction_agent_instructions",
+    "fact_extraction_agent_instructions",
+    "value_inference_agent_instructions",
     # Corrective RAG
     "corrective_query_generation_instructions",
     # Knowledge capture

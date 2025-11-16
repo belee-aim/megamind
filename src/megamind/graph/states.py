@@ -1,6 +1,7 @@
 from typing import List, Annotated, TypedDict, Dict, Any
 from langgraph.graph.message import add_messages
 from langchain_core.messages.utils import AnyMessage
+from megamind.graph.schemas import RawCompanyInformation, CompanyInformation
 
 
 class AgentState(TypedDict):
@@ -65,3 +66,18 @@ class RoleGenerationState(TypedDict):
     existing_roles: list[str] | None
     related_role: str | None
     related_role_permissions: Dict[str, Any] | None
+
+
+class DocumentExtractionState(TypedDict):
+    """
+    State for the two-node document extraction workflow.
+    """
+
+    # Input: List of document texts
+    documents: list[str]
+
+    # Node 1 output: Raw facts extracted from documents
+    raw_extraction: RawCompanyInformation | None
+
+    # Node 2 output: Enriched company information with inferred values
+    final_extraction: CompanyInformation | None
