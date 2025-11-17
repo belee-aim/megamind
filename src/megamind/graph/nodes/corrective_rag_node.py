@@ -7,7 +7,7 @@ and re-retrieves information to help the agent recover from failures.
 
 import re
 from typing import Dict, Any
-from langchain_core.messages import ToolMessage, AIMessage, HumanMessage
+from langchain_core.messages import ToolMessage, AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
@@ -324,7 +324,7 @@ async def corrective_rag_node(state: AgentState, config: RunnableConfig) -> Dict
         doctype=doctype,
     )
 
-    # Build correction context
+    # Build correction context for internal tracking
     error_context = {
         "error_description": error_description,
         "failed_tool": tool_name,
@@ -333,29 +333,30 @@ async def corrective_rag_node(state: AgentState, config: RunnableConfig) -> Dict
         "attempt_number": correction_attempts + 1,
     }
 
-    # Add corrective guidance message to help the agent
-    correction_message = AIMessage(
-        content=f"""🔧 **Correction Mode Activated**
+    logger.info(f"🔧 Correction Mode: Retrieved {len(corrective_knowledge)} chars of corrective knowledge")
+    logger.debug(f"Corrective knowledge preview: {corrective_knowledge[:200]}...")
 
-The previous operation failed with an error. I've retrieved additional knowledge to help fix this.
+    correction_guidance = f"""CORRECTION MODE: The previous operation failed. I've retrieved corrective knowledge to help you fix this.
 
-**Error:** {error_description[:200]}
-**Failed Operation:** {tool_name}
-**DocType:** {doctype or 'Unknown'}
+Error: {error_description[:200]}
+Failed Tool: {tool_name}
+DocType: {doctype or 'Unknown'}
 
-**Corrective Knowledge Retrieved:**
-{corrective_knowledge if corrective_knowledge else "No additional knowledge found. Please analyze the error carefully."}
+Corrective Knowledge:
+{corrective_knowledge if corrective_knowledge else "No additional knowledge found. Analyze the error carefully."}
 
-**Next Steps:**
+Instructions:
 1. Review the corrective knowledge above, especially required fields and validation rules
 2. Identify what was missing or incorrect in the previous attempt
 3. Retry the operation with complete and accurate information
 
 Do not give up - use the knowledge above to correct the issue and retry."""
-    )
+
+    # Use SystemMessage so it's available to LLM but will not show in user's chat history
+    system_message = SystemMessage(content=correction_guidance)
 
     return {
-        "messages": [correction_message],
+        "messages": [system_message],
         "correction_attempts": correction_attempts + 1,
         "last_error_context": error_context,
         "is_correction_mode": True,

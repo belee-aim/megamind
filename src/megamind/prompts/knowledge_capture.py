@@ -249,7 +249,7 @@ When extracting best practices or shortcuts, structure them as executable proces
       "possible_queries": [
         "How to fix missing paid_from account error?",
         "Payment Entry validation error paid_from",
-        "What to do when payment entry won't submit?",
+        "What to do when payment entry will not submit?",
         "How to set paid_from account in ERPNext?"
       ],
       "doctype_name": "Payment Entry",

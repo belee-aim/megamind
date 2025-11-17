@@ -7,7 +7,7 @@ by detecting errors, retrieving corrective knowledge, and retrying operations.
 
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 
 from megamind.graph.nodes.corrective_rag_node import (
     _detect_error,
@@ -352,5 +352,7 @@ class TestCRAGIntegration:
             assert "messages" in result
             assert len(result["messages"]) > 0
             correction_msg = result["messages"][0]
-            assert "Correction Mode" in correction_msg.content
+            # Verify it's a SystemMessage (internal guidance for LLM)
+            assert isinstance(correction_msg, SystemMessage)
+            assert "CORRECTION MODE" in correction_msg.content
             assert "delivery_date" in correction_msg.content.lower()
