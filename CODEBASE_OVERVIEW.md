@@ -119,14 +119,18 @@ This directory contains utility functions for configuration and logging.
 
 ### `src/megamind/dynamic_prompts/`
 
-This directory introduces a modular and powerful system for dynamically building prompts. It allows for the creation of complex and context-aware prompts by combining reusable components, which are defined in YAML files. This approach separates the prompt structure from the application logic, making it easier to manage, version, and experiment with different prompt strategies.
+**Note:** This directory was previously intended for a YAML-based dynamic prompt builder but has been deprecated in favor of Python-based prompts in `src/megamind/prompts/`.
 
--   **`components/`**: This subdirectory contains individual, reusable parts of a prompt, such as the agent's role, constraints, or examples of tool usage. Each component is a self-contained piece of text that can be included in a larger prompt.
--   **`core/`**: This contains the core logic for the prompt building system.
-    -   `builder.py`: The `PromptBuilder` class reads a YAML configuration, assembles the prompt from the specified components, and formats it with the necessary variables.
-    -   `models.py`: Defines the data models for the dynamic prompt system.
-    -   `registry.py`: Manages the registration and retrieval of prompt components.
--   **`variants/`**: This directory contains the YAML configuration files that define the structure of different prompts. Each YAML file specifies which components to include and in what order, allowing for the creation of multiple prompt variations for different tasks or models. For example, `generic.yaml` and `stock_movement.yaml` define the prompts for the general-purpose and stock movement agents, respectively.
+### `src/megamind/prompts/`
+
+This directory contains the Python-based prompt definitions for the application. Instead of a complex builder, prompts are defined as Python strings or functions that return formatted strings. This approach offers better type safety and easier integration with the application logic.
+
+-   **`megamind.py`**: Contains the `BASE_SYSTEM_PROMPT` and the `build_system_prompt` function for the main agent. It handles dynamic insertion of context like company name and current datetime.
+-   **`minion.py`**: Prompts for the "minion" agents (Wiki and Document search).
+-   **`role_generation.py`**: Prompts for the role generation workflow.
+-   **`corrective_rag.py`**: Prompts for the Corrective RAG node.
+-   **`knowledge_capture.py`**: Prompts for capturing knowledge from conversations.
+-   **`document_extraction.py`**: Prompts for extracting structured data from documents.
 
 ## Visual Representation
 
