@@ -11,11 +11,13 @@ This node runs after successful user interactions and automatically:
 
 import asyncio
 import hashlib
+import json
 from datetime import datetime
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
+from pydantic import ValidationError
 
 from megamind import prompts
 from megamind.clients.titan_client import TitanClient
@@ -263,11 +265,47 @@ def _format_conversation(
     return "\n\n".join(formatted)
 
 
+def _parse_json_strings_to_dicts(data):
+    """
+    Recursively parse JSON strings to dictionaries.
+
+    Some LLM models return nested JSON as strings instead of parsed dicts.
+    This function recursively converts any JSON string fields to actual dicts/lists.
+
+    Args:
+        data: Data structure that may contain JSON strings
+
+    Returns:
+        Data structure with JSON strings converted to dicts/lists
+    """
+    if isinstance(data, str):
+        # Try to parse as JSON
+        try:
+            parsed = json.loads(data)
+            # Recursively parse the result in case it contains more JSON strings
+            return _parse_json_strings_to_dicts(parsed)
+        except (json.JSONDecodeError, TypeError):
+            # Not valid JSON, return as-is
+            return data
+    elif isinstance(data, dict):
+        # Recursively parse all dict values
+        return {k: _parse_json_strings_to_dicts(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        # Recursively parse all list items
+        return [_parse_json_strings_to_dicts(item) for item in data]
+    else:
+        # Return primitives as-is
+        return data
+
+
 async def _call_knowledge_extraction_llm(
     conversation: str,
 ) -> KnowledgeExtractionResult:
     """
     Call LLM to extract knowledge from conversation.
+
+    Handles cases where LLM returns JSON strings instead of parsed dicts
+    by attempting to parse them manually.
 
     Args:
         conversation: Formatted conversation text
@@ -292,8 +330,58 @@ async def _call_knowledge_extraction_llm(
             f"LLM extraction result: should_save={result.should_save}, entries={len(result.entries)}"
         )
         return result
+    except ValidationError as e:
+        # Check if error is about dict_type (JSON strings instead of dicts)
+        error_str = str(e)
+        if "dict_type" in error_str or "Input should be a valid dictionary" in error_str:
+            logger.warning(
+                "LLM returned JSON strings instead of dicts, attempting manual parsing..."
+            )
+            try:
+                # Get raw response without structured output
+                raw_response = await llm.ainvoke(prompt)
+                raw_content = raw_response.content
+
+                # Try to extract JSON from response
+                # Look for JSON block in markdown code fence or raw JSON
+                if "```json" in raw_content:
+                    json_start = raw_content.find("```json") + 7
+                    json_end = raw_content.find("```", json_start)
+                    json_str = raw_content[json_start:json_end].strip()
+                elif "```" in raw_content:
+                    json_start = raw_content.find("```") + 3
+                    json_end = raw_content.find("```", json_start)
+                    json_str = raw_content[json_start:json_end].strip()
+                else:
+                    # Assume entire content is JSON
+                    json_str = raw_content.strip()
+
+                # Parse the JSON string
+                parsed_json = json.loads(json_str)
+
+                # Recursively convert any JSON strings to dicts
+                parsed_data = _parse_json_strings_to_dicts(parsed_json)
+
+                # Create KnowledgeExtractionResult from parsed data
+                result = KnowledgeExtractionResult(**parsed_data)
+                logger.info(
+                    f"Successfully parsed JSON strings: should_save={result.should_save}, "
+                    f"entries={len(result.entries)}"
+                )
+                return result
+
+            except Exception as parse_error:
+                logger.error(
+                    f"Failed to manually parse JSON strings: {parse_error}", exc_info=True
+                )
+                # Fall through to return empty result
+
+        # Log the original validation error
+        logger.error(f"Validation error in knowledge extraction: {e}", exc_info=True)
+        return KnowledgeExtractionResult(should_save=False, entries=[])
+
     except Exception as e:
-        logger.error(f"Error calling knowledge extraction LLM: {e}")
+        logger.error(f"Error calling knowledge extraction LLM: {e}", exc_info=True)
         # Return empty result on error
         return KnowledgeExtractionResult(should_save=False, entries=[])
 
