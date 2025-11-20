@@ -53,6 +53,10 @@ async def _extract_and_save_knowledge(state: AgentState, config: RunnableConfig)
 
     For error_solution/general_knowledge:
         1. Save to erpnext_knowledge table only
+
+    For response_optimization:
+        1. Check if metrics exceed thresholds
+        2. Save to erpnext_knowledge table with optimization metadata
     """
     try:
         # Extract conversation messages
@@ -61,14 +65,38 @@ async def _extract_and_save_knowledge(state: AgentState, config: RunnableConfig)
             logger.debug("Insufficient messages for knowledge extraction")
             return
 
+        # Extract performance metrics from state
+        total_time_ms = state.get("total_response_time_ms", 0) or 0
+        tool_call_count = state.get("tool_call_count", 0) or 0
+        llm_latency_ms = state.get("llm_latency_ms", 0) or 0
+
+        # Convert to seconds for threshold checks
+        total_time_s = total_time_ms / 1000
+        llm_latency_s = llm_latency_ms / 1000
+
+        # Check if response was slow (exceeds any threshold)
+        is_slow_response = (
+            total_time_s > 30 or tool_call_count > 3 or llm_latency_s > 10
+        )
+
+        if is_slow_response:
+            logger.info(
+                f"Slow response detected: total_time={total_time_s:.1f}s, "
+                f"tool_calls={tool_call_count}, llm_latency={llm_latency_s:.1f}s"
+            )
+
         # Format conversation for LLM
-        conversation_text = _format_conversation(messages)
+        conversation_text = _format_conversation(
+            messages, total_time_ms, tool_call_count, llm_latency_ms, is_slow_response
+        )
         logger.debug(
             f"Conversation formatted: {len(messages)} messages -> {len(conversation_text)} chars"
         )
 
         logger.info("Analyzing conversation for knowledge extraction")
-        logger.debug(f"Calling knowledge extraction LLM with {len(conversation_text)} chars")
+        logger.debug(
+            f"Calling knowledge extraction LLM with {len(conversation_text)} chars"
+        )
 
         # Call LLM to extract knowledge
         extraction_result = await _call_knowledge_extraction_llm(conversation_text)
@@ -91,7 +119,9 @@ async def _extract_and_save_knowledge(state: AgentState, config: RunnableConfig)
         # Log entry type distribution
         type_counts = {}
         for entry in extraction_result.entries:
-            type_counts[entry.knowledge_type] = type_counts.get(entry.knowledge_type, 0) + 1
+            type_counts[entry.knowledge_type] = (
+                type_counts.get(entry.knowledge_type, 0) + 1
+            )
         logger.info(f"Entry type distribution: {type_counts}")
 
         # Save each knowledge entry
@@ -100,7 +130,9 @@ async def _extract_and_save_knowledge(state: AgentState, config: RunnableConfig)
 
         failed_count = 0
         for idx, entry in enumerate(extraction_result.entries, 1):
-            logger.debug(f"Processing entry {idx}/{len(extraction_result.entries)}: '{entry.title}'")
+            logger.debug(
+                f"Processing entry {idx}/{len(extraction_result.entries)}: '{entry.title}'"
+            )
             try:
                 await _save_knowledge_entry(entry, titan_client)
             except Exception as e:
@@ -118,18 +150,46 @@ async def _extract_and_save_knowledge(state: AgentState, config: RunnableConfig)
         logger.error(f"Error in knowledge capture background task: {e}")
 
 
-def _format_conversation(messages) -> str:
+def _format_conversation(
+    messages,
+    total_time_ms: float = 0,
+    tool_call_count: int = 0,
+    llm_latency_ms: float = 0,
+    is_slow_response: bool = False,
+) -> str:
     """
     Format conversation messages into readable text for LLM analysis.
     Includes MCP tool invocations for learning usage patterns.
+    Includes performance metrics if response was slow.
 
     Args:
         messages: List of conversation messages
+        total_time_ms: Total response time in milliseconds
+        tool_call_count: Number of tool calls made
+        llm_latency_ms: LLM latency in milliseconds
+        is_slow_response: Whether response exceeded performance thresholds
 
     Returns:
-        Formatted conversation string with tool calls
+        Formatted conversation string with tool calls and optional metrics
     """
     formatted = []
+
+    # Add performance metrics header if response was slow
+    if is_slow_response and (total_time_ms > 0 or tool_call_count > 0):
+        total_time_s = total_time_ms / 1000
+        llm_latency_s = llm_latency_ms / 1000
+
+        formatted.append("=== PERFORMANCE METRICS ===")
+        formatted.append(f"Total Response Time: {total_time_s:.1f}s (threshold: 30s)")
+        formatted.append(f"Total Tool Calls: {tool_call_count} (threshold: 3)")
+        formatted.append(f"LLM Latency: {llm_latency_s:.1f}s (threshold: 10s)")
+        formatted.append(
+            "⚠️  Response exceeded performance thresholds - analyze for optimization opportunities\n"
+        )
+        formatted.append("=========================\n")
+
+    # Track knowledge search calls for analysis
+    knowledge_search_count = 0
 
     for msg in messages:
         # Get message type and content
@@ -165,14 +225,40 @@ def _format_conversation(messages) -> str:
                     args_str = ", ".join(
                         f"{k}={repr(v)[:50]}" for k, v in args_summary.items()
                     )
-                    formatted.append(f"  → MCP Tool Call: {tool_name}({args_str})")
+
+                    # Special highlighting for knowledge searches
+                    if tool_name == "search_erpnext_knowledge":
+                        knowledge_search_count += 1
+                        formatted.append(
+                            f"  🔍 Knowledge Search #{knowledge_search_count}: {tool_name}({args_str})"
+                        )
+                    else:
+                        formatted.append(f"  → Tool Call: {tool_name}({args_str})")
 
         elif msg_type == "tool":
             # Include tool results but keep concise
             tool_name = getattr(msg, "name", "tool")
             # Truncate long results
             result_preview = content[:200] + "..." if len(content) > 200 else content
-            formatted.append(f"Tool Result ({tool_name}): {result_preview}")
+
+            # Special formatting for knowledge search results
+            if tool_name == "search_erpnext_knowledge":
+                # Try to extract result count from content
+                result_count = "unknown"
+                if "entries found" in content:
+                    # Extract number from "Knowledge Search Results (X entries found)"
+                    import re
+
+                    match = re.search(r"\((\d+) entries? found\)", content)
+                    if match:
+                        result_count = match.group(1)
+
+                formatted.append(
+                    f"  📊 Knowledge Search Results: {result_count} entries returned"
+                )
+                formatted.append(f"     Preview: {result_preview}")
+            else:
+                formatted.append(f"Tool Result ({tool_name}): {result_preview}")
 
     return "\n\n".join(formatted)
 
@@ -190,7 +276,7 @@ async def _call_knowledge_extraction_llm(
         KnowledgeExtractionResult with extracted entries
     """
     config = Configuration()
-    llm = ChatGoogleGenerativeAI(model=config.query_generator_model)
+    llm = config.get_chat_model(custom_model="kimi-k2-thinking")
 
     # Format prompt with conversation
     prompt = prompts.knowledge_extraction_agent_instructions.format(
@@ -217,7 +303,7 @@ async def _save_knowledge_entry(entry: KnowledgeEntrySchema, titan_client: Titan
     Save a knowledge entry to appropriate Titan tables.
 
     For best_practice/shortcut: saves to BOTH tables
-    For other types: saves to erpnext_knowledge only
+    For response_optimization/error_solution/general_knowledge: saves to erpnext_knowledge only
 
     Args:
         entry: Knowledge entry to save
@@ -247,7 +333,7 @@ async def _save_knowledge_entry(entry: KnowledgeEntrySchema, titan_client: Titan
         # Dual save: process_definitions + erpnext_knowledge
         await _save_as_process(entry, titan_client)
     else:
-        # Single save: erpnext_knowledge only
+        # Single save: erpnext_knowledge only (includes response_optimization)
         await _save_as_knowledge(entry, titan_client)
 
 
@@ -271,7 +357,9 @@ async def _save_as_process(entry: KnowledgeEntrySchema, titan_client: TitanClien
     try:
         # Convert steps from dict of ProcessStepSchema to dict of dicts
         step_count = len(entry.steps) if entry.steps else 0
-        logger.debug(f"Converting {step_count} process steps for process '{process_id}'")
+        logger.debug(
+            f"Converting {step_count} process steps for process '{process_id}'"
+        )
 
         steps_dict = {}
         if entry.steps:
@@ -340,7 +428,7 @@ async def _save_as_process(entry: KnowledgeEntrySchema, titan_client: TitanClien
 
 async def _save_as_knowledge(entry: KnowledgeEntrySchema, titan_client: TitanClient):
     """
-    Save error solution or general knowledge to erpnext_knowledge table only.
+    Save error solution, general knowledge, or response optimization to erpnext_knowledge table only.
 
     Args:
         entry: Knowledge entry
@@ -359,6 +447,37 @@ async def _save_as_knowledge(entry: KnowledgeEntrySchema, titan_client: TitanCli
             f"queries={len(entry.possible_queries)}"
         )
 
+        # Build metadata
+        meta_data = {
+            "knowledge_type": entry.knowledge_type,
+            "auto_captured": True,
+            "captured_at": datetime.now().isoformat(),
+        }
+
+        # Add optimization-specific metadata if this is a response_optimization entry
+        if entry.knowledge_type == "response_optimization":
+            if entry.original_metrics:
+                meta_data["original_metrics"] = entry.original_metrics
+            if entry.optimization_approach:
+                meta_data["optimization_approach"] = entry.optimization_approach
+            if entry.estimated_improvement:
+                meta_data["estimated_improvement"] = entry.estimated_improvement
+
+            # Add search query optimization metadata if present
+            if entry.ineffective_search_query:
+                meta_data["ineffective_search_query"] = entry.ineffective_search_query
+            if entry.better_search_query:
+                meta_data["better_search_query"] = entry.better_search_query
+            if entry.search_query_improvements:
+                meta_data["search_query_improvements"] = entry.search_query_improvements
+
+            logger.debug(
+                f"Response optimization metadata: "
+                f"metrics={entry.original_metrics}, "
+                f"improvement={entry.estimated_improvement}, "
+                f"search_query_opt={bool(entry.ineffective_search_query)}"
+            )
+
         await titan_client.create_knowledge_entry(
             title=entry.title,
             content=formatted_content,
@@ -366,11 +485,7 @@ async def _save_as_knowledge(entry: KnowledgeEntrySchema, titan_client: TitanCli
             doctype_name=entry.doctype_name,
             module=entry.module,
             priority=entry.priority,
-            meta_data={
-                "knowledge_type": entry.knowledge_type,
-                "auto_captured": True,
-                "captured_at": datetime.now().isoformat(),
-            },
+            meta_data=meta_data,
             version=1,
         )
 

@@ -19,7 +19,7 @@ async def search_erpnext_knowledge(
     match_count: int = 5,
 ) -> str:
     """
-    Search ERPNext knowledge base for relevant information about workflows, best practices, schemas, and examples.
+    Search ERPNext knowledge base for relevant information about workflows, best practices, schemas, examples, and optimization patterns.
 
     **CRITICAL: Use this tool BEFORE calling any MCP tools for ERPNext operations!**
 
@@ -37,6 +37,7 @@ async def search_erpnext_knowledge(
     - User requests best practices (e.g., "Best way to handle stock reconciliation?")
     - User wants examples of operations (e.g., "Show me an example of a Purchase Order")
     - Troubleshooting errors or issues (e.g., "Why am I getting validation error X?")
+    - **Learning from past inefficiencies** - search for optimization patterns to improve response speed
 
     **Parameters:**
     - query: Natural language search query describing what you need
@@ -55,8 +56,14 @@ async def search_erpnext_knowledge(
     - search_erpnext_knowledge("Stock reconciliation process")
     - search_erpnext_knowledge("Fixing 'Insufficient stock' error")
 
+    **For optimization patterns (learn from past slow responses):**
+    - search_erpnext_knowledge("optimization create sales order")
+    - search_erpnext_knowledge("improve search query payment entry")
+    - search_erpnext_knowledge("faster approach stock entry")
+    - search_erpnext_knowledge("reduce tool calls sales order")
+
     **Returns:**
-    Formatted knowledge entries with titles, relevance scores, and full content.
+    Formatted knowledge entries with titles, relevance scores, and full content. May include optimization patterns with search query improvements and performance tips.
 
     **IMPORTANT:** Review the returned schemas and workflows carefully before calling MCP tools.
     Do NOT skip this step - it prevents errors and ensures successful operations.
@@ -162,3 +169,5 @@ async def get_erpnext_knowledge_by_id(knowledge_id: int) -> str:
     except Exception as e:
         logger.error(f"Error in get_erpnext_knowledge_by_id tool: {e}")
         return f"Error retrieving knowledge entry {knowledge_id}: {str(e)}"
+
+

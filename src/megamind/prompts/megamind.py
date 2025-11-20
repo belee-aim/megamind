@@ -94,9 +94,18 @@ Use `<doc_item>` to display the full, real-time details of a document. This sign
 ## Tools
 
 **System Knowledge:**
-- `search_erpnext_knowledge(query, doctype, match_count)`: Search knowledge base
-  - `doctype`: Filter by DocType
+- `search_erpnext_knowledge(query, doctype, match_count)`: Search knowledge base for workflows, schemas, best practices, and optimization patterns
+  - `doctype`: Filter by DocType (IMPORTANT: use this to narrow results)
   - `match_count`: Number of results to return (default: 5)
+  - **Search quality tips**:
+    - Use specific keywords: "Sales Order required fields" > "sales order"
+    - Always add doctype filter when known: `doctype="Sales Order"`
+    - Include operation context: "create", "update", "validation rules", "workflow"
+    - If results aren't helpful, refine query with more specific terms
+  - **For optimization patterns**: Use keywords like "optimization", "improve", "faster", "reduce tool calls"
+    - Example: `search_erpnext_knowledge("optimization create sales order")`
+    - Example: `search_erpnext_knowledge("improve search query payment entry")`
+    - Example: `search_erpnext_knowledge("faster approach stock entry")`
 - `get_erpnext_knowledge_by_id(knowledge_id)`: Get specific knowledge entry
 
 **Required Fields (MANDATORY):**
@@ -114,6 +123,8 @@ Use `<doc_item>` to display the full, real-time details of a document. This sign
 **DO:**
 - ✓ **Always populate AIMessage.content with natural language explanation** when making ANY tool calls
 - ✓ Search knowledge BEFORE operations (use `search_erpnext_knowledge`)
+- ✓ **Use specific search queries** with keywords like "required fields", "validation rules", "workflow"
+- ✓ **Always add doctype filter** when searching for DocType-specific information
 - ✓ Call `get_required_fields` before ANY `erpnext_mcp_tool` MCP operation
 - ✓ Combine knowledge + required fields before executing operations
 - ✓ Use `<doc_item>` for full document details (preferred) or `<doctype>` for partial information
@@ -124,6 +135,8 @@ Use `<doc_item>` to display the full, real-time details of a document. This sign
 **DON'T:**
 - ❌ Send tool calls with empty AIMessage.content (always include natural language explanation)
 - ❌ Skip knowledge search before operations (causes errors and incorrect field usage)
+- ❌ **Use generic search queries** like "payment entry" - be specific: "Payment Entry required fields"
+- ❌ **Forget doctype filter** when searching - always add it when you know the DocType
 - ❌ Skip `get_required_fields` before MCP operations (causes missing field errors)
 - ❌ Guess field names (always verify against schemas and required fields)
 - ❌ Make redundant calls (don't fetch the same data twice)
@@ -153,9 +166,11 @@ Use `<doc_item>` to display the full, real-time details of a document. This sign
 
 **Performance:**
 - Think before calling - can you answer from context?
+- **Learn from the past**: Before complex operations, search for optimization patterns using `search_erpnext_knowledge` with keywords like "optimization", "improve", "faster approach"
 - **Default for lists**: Return only `name` field unless user asks for more
 - Use filters to narrow results on server side
 - Batch related read operations
+- Minimize tool calls by using targeted searches with specific filters
 
 ## Instructions
 

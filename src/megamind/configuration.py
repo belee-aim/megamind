@@ -48,7 +48,7 @@ class Configuration(BaseModel):
 
         return cls(**values)
 
-    def get_chat_model(self, **kwargs) -> BaseChatModel:
+    def get_chat_model(self, custom_model=None, **kwargs) -> BaseChatModel:
         """
         Create a chat model instance using the configured provider.
 
@@ -62,7 +62,10 @@ class Configuration(BaseModel):
         api_key = settings.api_key or settings.google_api_key
 
         # Use configured model or settings model
-        model = settings.model or self.query_generator_model
+        if custom_model:
+            model = custom_model
+        else:
+            model = settings.model or self.query_generator_model
 
         return LLMFactory.create_chat_model(
             provider=settings.provider,

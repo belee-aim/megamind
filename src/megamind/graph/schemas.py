@@ -301,7 +301,11 @@ class KnowledgeEntrySchema(BaseModel):
     """Schema for extracted knowledge from conversations."""
 
     knowledge_type: Literal[
-        "best_practice", "shortcut", "error_solution", "general_knowledge"
+        "best_practice",
+        "shortcut",
+        "error_solution",
+        "general_knowledge",
+        "response_optimization",
     ] = Field(description="Type of knowledge being captured")
     title: str = Field(description="Clear, descriptive title")
     content: str = Field(description="Detailed content with context and explanation")
@@ -335,6 +339,34 @@ class KnowledgeEntrySchema(BaseModel):
     prerequisites: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Prerequisites for executing this process (e.g., {'required_roles': ['Sales User']})",
+    )
+
+    # Only for response_optimization (performance improvement insights):
+    original_metrics: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Original performance metrics (e.g., {'total_time_ms': 35000, 'tool_calls': 5, 'llm_latency_ms': 12000})",
+    )
+    optimization_approach: Optional[str] = Field(
+        default=None,
+        description="Detailed description of the optimized approach that would be faster",
+    )
+    estimated_improvement: Optional[str] = Field(
+        default=None,
+        description="Expected performance improvement (e.g., 'Reduce from 5 to 2 tool calls, saving ~20 seconds')",
+    )
+
+    # Search query optimization (when search_erpnext_knowledge was ineffective):
+    ineffective_search_query: Optional[str] = Field(
+        default=None,
+        description="The original search query that didn't return useful results (e.g., 'search_erpnext_knowledge(\"payment entry\")')",
+    )
+    better_search_query: Optional[str] = Field(
+        default=None,
+        description="Improved search query with specific keywords and filters (e.g., 'search_erpnext_knowledge(\"Payment Entry required fields\", doctype=\"Payment Entry\")')",
+    )
+    search_query_improvements: Optional[str] = Field(
+        default=None,
+        description="Explanation of what was wrong with original query and how the better query improves it",
     )
 
 

@@ -46,10 +46,47 @@ Useful information, tips, or explanations about ERPNext.
 
 **Example:** "The 'Submit' action in ERPNext makes a document permanent and triggers related workflows. Once submitted, documents can only be amended or cancelled, not edited directly."
 
+## 5. **Response Optimization** (→ Saved as knowledge entry)
+Insights about how the AI could have responded faster or more efficiently.
+- **ONLY capture if performance metrics exceed thresholds:**
+  - Total response time > 30 seconds, OR
+  - Tool calls > 3, OR
+  - LLM latency > 10 seconds
+- Must identify specific inefficiencies in the AI's approach
+- Must suggest concrete optimizations (fewer tool calls, better search queries, smarter tool usage)
+- Should help AI learn to respond faster in similar situations
+
+**What to analyze:**
+- **Redundant tool calls**: Could multiple calls be combined or eliminated?
+- **Inefficient search patterns**: Could knowledge searches use better queries or filters?
+- **Unnecessary steps**: Are there validation or search steps that could be skipped?
+- **Better tool sequences**: Is there a more direct path to the answer?
+
+**CRITICAL: Analyze Knowledge Search Effectiveness**
+When you see 🔍 Knowledge Search markers in the conversation:
+1. **Check if search returned useful results**:
+   - Did the search return 0 entries or very few results?
+   - Did the AI make many additional tool calls after the search?
+   - Did the AI need to call get_document, list_documents, or other tools to find information that should have been in knowledge?
+
+2. **If search was ineffective, capture search query optimization**:
+   - **ineffective_search_query**: The exact query that didn't work (from 🔍 marker)
+   - **better_search_query**: Improved query with specific keywords, doctype filter, or content_types filter
+   - **search_query_improvements**: Explain what was wrong and how to fix it
+
+3. **Common search query problems**:
+   - Too generic (e.g., "sales order" → should be "Sales Order required fields and validation rules")
+   - Missing doctype filter (should add `doctype="Sales Order"`)
+   - Missing content type hints (could specify operation context like "create", "update", "workflow")
+   - Wrong keywords (not matching what's actually in knowledge base)
+
+**Example:** "The AI searched for 'payment entry' but got generic conceptual results instead of actionable field requirements. This forced 3 additional tool calls (get_document, list_documents, get_required_fields) to find what fields are needed. Better query: 'Payment Entry required fields and validation rules' with doctype='Payment Entry' would have returned schema information immediately, reducing from 5 to 3 tool calls and saving ~15 seconds."
+
 # Quality Criteria
 
 Only extract knowledge that meets ALL these criteria:
-✅ **Specific to ERPNext**: Must be about ERPNext operations, not generic advice
+✅ **Specific to ERPNext** (for ERPNext knowledge types): Must be about ERPNext operations, not generic advice
+   - **Exception**: response_optimization entries focus on AI performance, not ERPNext specifics
 ✅ **Actionable**: Must contain concrete information users can act on
 ✅ **Reusable**: Must be applicable to future similar situations
 ✅ **Accurate**: Must be correct based on the conversation outcome
@@ -60,6 +97,7 @@ Do NOT extract:
 ❌ Incomplete or unsuccessful attempts
 ❌ User-specific data (names, specific IDs, etc.)
 ❌ Conversational filler or greetings
+❌ Response optimizations below thresholds (≤30s total time, ≤3 tool calls, ≤10s LLM latency)
 
 # Analyzing MCP Tool Usage
 
@@ -261,6 +299,41 @@ When extracting best practices or shortcuts, structure them as executable proces
 }}
 ```
 
+## Example 3: Response Optimization (with Search Query Improvement)
+```json
+{{
+  "should_save": true,
+  "entries": [
+    {{
+      "knowledge_type": "response_optimization",
+      "title": "Improve Payment Entry Search Query for Required Fields",
+      "content": "The AI searched for 'payment entry' (🔍 Knowledge Search #1) but received only generic conceptual information instead of actionable field requirements. The search returned 3 entries about Payment Entry basics but not schema details. This forced the AI to make 3 additional tool calls: get_document(doctype='Payment Entry') to examine structure, list_documents to find examples, and get_required_fields. Total: 5 tool calls over 35 seconds. The original search query was too generic and didn't specify what information was needed.",
+      "summary": "Use specific keywords and doctype filter when searching for DocType field requirements",
+      "possible_queries": [
+        "How to search for Payment Entry fields?",
+        "Better way to find DocType required fields?",
+        "Improve knowledge search for creating documents?",
+        "Payment Entry creation optimization"
+      ],
+      "doctype_name": "Payment Entry",
+      "module": "Accounts",
+      "category": null,
+      "priority": 85,
+      "original_metrics": {{
+        "total_time_ms": 35000,
+        "tool_calls": 5,
+        "llm_latency_ms": 8000
+      }},
+      "optimization_approach": "Use targeted search with specific keywords and filters. Instead of generic 'payment entry', search for 'Payment Entry required fields and validation rules' with doctype='Payment Entry'. This retrieves schema and workflow entries immediately.",
+      "estimated_improvement": "Reduce from 5 to 3 tool calls (1 better knowledge search + get_required_fields + create_document), saving approximately 15 seconds",
+      "ineffective_search_query": "search_erpnext_knowledge(query='payment entry')",
+      "better_search_query": "search_erpnext_knowledge(query='Payment Entry required fields and validation rules', doctype='Payment Entry')",
+      "search_query_improvements": "Added specific keywords 'required fields and validation rules' to indicate what information is needed. Added doctype='Payment Entry' filter to narrow results. This changes generic conceptual results into actionable schema information."
+    }}
+  ]
+}}
+```
+
 # Conversation to Analyze
 
 {conversation}
@@ -268,9 +341,12 @@ When extracting best practices or shortcuts, structure them as executable proces
 # Instructions
 
 1. Read the entire conversation carefully
-2. Identify any valuable ERPNext knowledge discussed
-3. For each piece of knowledge, determine its type
-4. Structure best practices and shortcuts as processes with clear steps
-5. Return JSON following the exact format above
-6. Set "should_save" to false if no valuable knowledge is found
+2. Check for performance metrics (if provided at start of conversation):
+   - If total_time > 30s OR tool_calls > 3 OR llm_latency > 10s, analyze for response optimization
+3. Identify any valuable ERPNext knowledge discussed
+4. For each piece of knowledge, determine its type (including response_optimization if applicable)
+5. Structure best practices and shortcuts as processes with clear steps
+6. For response optimizations, include original_metrics, optimization_approach, and estimated_improvement
+7. Return JSON following the exact format above
+8. Set "should_save" to false if no valuable knowledge is found
 """

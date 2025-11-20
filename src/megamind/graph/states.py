@@ -19,6 +19,12 @@ class AgentState(TypedDict):
     last_error_context: Dict[str, Any] | None
     is_correction_mode: bool | None
 
+    # Response optimization metrics (for knowledge capture)
+    response_start_time: float | None
+    llm_latency_ms: float | None
+    tool_call_count: int | None
+    total_response_time_ms: float | None
+
 
 class StockMovementState(TypedDict):
     """

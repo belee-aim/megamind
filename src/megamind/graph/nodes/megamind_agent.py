@@ -1,3 +1,4 @@
+import time
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import AIMessage, ToolMessage
 from loguru import logger
@@ -70,6 +71,10 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
     Generates a response using the configured LLM provider based on the retrieved documents and conversation history.
     """
     logger.debug("---RAG NODE---")
+
+    # Track response start time
+    response_start = time.time()
+
     configurable = Configuration.from_runnable_config(config)
     mcp_client = client_manager.get_client()
 
@@ -86,7 +91,16 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
     titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
     all_tools = mcp_tools + titan_tools
 
+    # Track LLM invocation time
+    llm_start = time.time()
     response = await llm.bind_tools(all_tools).ainvoke(messages)
+    llm_end = time.time()
+
+    # Calculate LLM latency
+    llm_latency_ms = (llm_end - llm_start) * 1000
+
+    # Count tool calls in response
+    tool_call_count = len(response.tool_calls) if response.tool_calls else 0
 
     # Add access token to tool call args if present (only for MCP tools)
     if response.tool_calls:
@@ -96,4 +110,26 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
             if any(tool.name == tool_name for tool in mcp_tools):
                 tool_call["args"]["user_token"] = access_token
 
-    return {"messages": [response]}
+    # Calculate total response time
+    response_end = time.time()
+    total_response_time_ms = (response_end - response_start) * 1000
+
+    # Log performance metrics
+    logger.debug(
+        f"Agent metrics: LLM latency={llm_latency_ms:.2f}ms, "
+        f"tool_calls={tool_call_count}, total_time={total_response_time_ms:.2f}ms"
+    )
+
+    # Accumulate metrics in state (for knowledge capture analysis)
+    # Get existing metrics or initialize
+    existing_llm_latency = state.get("llm_latency_ms", 0) or 0
+    existing_tool_calls = state.get("tool_call_count", 0) or 0
+    existing_total_time = state.get("total_response_time_ms", 0) or 0
+
+    return {
+        "messages": [response],
+        "response_start_time": response_start,
+        "llm_latency_ms": existing_llm_latency + llm_latency_ms,
+        "tool_call_count": existing_tool_calls + tool_call_count,
+        "total_response_time_ms": existing_total_time + total_response_time_ms,
+    }
