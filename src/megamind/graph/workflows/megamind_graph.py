@@ -106,8 +106,12 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
     )
 
     # CRAG: Route tool results through corrective analysis before returning to agent
-    workflow.add_edge("mcp_tools", "corrective_rag_node")
-    workflow.add_edge("corrective_rag_node", "megamind_agent_node")
+    # Temporarily disabled CRAG
+    # workflow.add_edge("mcp_tools", "corrective_rag_node")
+    # workflow.add_edge("corrective_rag_node", "megamind_agent_node")
+    # workflow.add_edge("knowledge_capture_node", END)
+
+    workflow.add_edge("mcp_tools", "megamind_agent_node")
     workflow.add_edge("knowledge_capture_node", END)
 
     # Compile the graph
