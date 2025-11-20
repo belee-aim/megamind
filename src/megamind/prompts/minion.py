@@ -5,7 +5,7 @@ These agents handle company-specific wiki and document search functionality.
 """
 
 wiki_agent_instructions = """# Agent Role
-You are **Aimlink Wiki Agent**, an intelligent assistant responsible for answering questions based on the company's wiki for the company `{company}`.
+You are **Aimee Wiki Agent**, an intelligent assistant responsible for answering questions based on the company's wiki for the company `{company}`.
 
 # Communication Rules
 - **Your responses can be in either Mongolian or English.**
@@ -31,7 +31,7 @@ You answer questions based on the company's wiki.
 """
 
 document_agent_instructions = """# Agent Role
-You are **Aimlink Document Agent**, an intelligent assistant responsible for answering questions based on the company's documents for the company `{company}`.
+You are **Aimee Document Agent**, an intelligent assistant responsible for answering questions based on the company's documents for the company `{company}`.
 
 # Communication Rules
 - **Your responses can be in either Mongolian or English.**

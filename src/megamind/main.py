@@ -55,9 +55,7 @@ async def lifespan(app: FastAPI):
     retry_delay = 2  # seconds
 
     # Use supabase_db_url if available, otherwise fall back to supabase_connection_string
-    connection_string = (
-        settings.supabase_db_url or settings.supabase_connection_string
-    )
+    connection_string = settings.supabase_db_url or settings.supabase_connection_string
 
     # Initialize connection pool with retry logic
     for attempt in range(1, max_retries + 1):
@@ -357,7 +355,7 @@ async def stream(
     thread: str = None,
 ):
     """
-    Endpoint to chat with Aimlink AI assistant.
+    Endpoint to chat with Aimee AI assistant.
     Streams the response from the AI model with RAG-augmented knowledge.
     """
     logger.info(f"Chat endpoint called: thread={thread}")
