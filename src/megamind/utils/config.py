@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str
     supabase_connection_string: str
+    supabase_db_url: str = ""  # Database URL for connection pool (if different from connection_string)
+
+    # Database Connection Pool Configuration
+    db_pool_min_size: int = 2  # Minimum number of connections to keep in the pool
+    db_pool_max_size: int = 100  # Maximum number of connections allowed in the pool
+    db_pool_max_waiting: int = 50  # Maximum number of requests waiting for a connection
+    db_pool_max_lifetime: float = 1800.0  # Maximum lifetime of a connection in seconds (30 min)
+    db_pool_max_idle: float = 180.0  # Maximum idle time before closing a connection (3 min)
+    db_pool_reconnect_timeout: float = 300.0  # Timeout for reconnection attempts (5 min)
+    db_pool_timeout: float = 30.0  # Timeout for acquiring a connection from the pool
+    db_pool_num_workers: int = 3  # Number of background workers for pool maintenance
 
     # Application Configuration
     log_level: str = "INFO"

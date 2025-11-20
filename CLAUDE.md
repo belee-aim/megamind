@@ -300,10 +300,70 @@ These are simpler string templates with `{company}` and other placeholders forma
 ### State Management and Persistence
 
 Uses **AsyncPostgresSaver** for checkpoint persistence:
-- Checkpointer is initialized in `main.py:lifespan()` with `settings.supabase_connection_string`
+- Checkpointer is initialized in `main.py:lifespan()` with connection pool
 - Thread state is retrieved with `checkpointer.aget(config)` where config contains `thread_id`
 - System prompts are only added when `thread_state is None` (new threads)
 - Cookie-based authentication is passed through graph state for ERPNext/Frappe client calls
+
+### Database Connection Pool
+
+The application uses **AsyncConnectionPool** from psycopg for robust database connection management:
+
+**Architecture:**
+- `src/megamind/utils/database.py`: Connection utilities (configure, check callbacks)
+- Pool initialized in `main.py:lifespan()` with comprehensive configuration
+- Automatic connection health checking and replacement
+- Graceful startup retry logic and shutdown handling
+
+**Pool Configuration** (configurable via environment variables):
+- `min_size=2`: Minimum connections maintained in pool
+- `max_size=100`: Maximum concurrent connections allowed
+- `max_waiting=50`: Maximum requests that can queue for a connection
+- `max_lifetime=1800s`: Connections recycled after 30 minutes
+- `max_idle=180s`: Idle connections closed after 3 minutes
+- `reconnect_timeout=300s`: Retry reconnection attempts for 5 minutes
+- `timeout=30s`: Timeout for acquiring connection from pool
+- `num_workers=3`: Background workers for pool maintenance
+
+**Connection Health Features:**
+- **TCP Keepalives**: Detect and close broken connections automatically
+  - `keepalives_idle=30s`: Start keepalive packets after 30s of inactivity
+  - `keepalives_interval=10s`: Send keepalive every 10s after idle period
+  - `keepalives_count=5`: Declare connection dead after 5 failed keepalives
+- **Statement Timeout**: Kill queries running longer than 60 seconds
+- **Health Checking**: Execute `SELECT 1` before giving connection to client
+- **Automatic Configuration**: New connections configured with optimal settings
+
+**Startup Behavior:**
+- Retry logic: 3 attempts with 2-second delays between retries
+- Detailed logging of pool configuration and initialization status
+- Fallback from `SUPABASE_DB_URL` to `SUPABASE_CONNECTION_STRING`
+- Critical failure if pool cannot be opened after all retries
+
+**Shutdown Behavior:**
+- Explicit pool closure with proper error handling
+- Waits for active connections to complete before shutdown
+- Logs shutdown progress and any errors during closure
+
+**Benefits:**
+- ✅ **Concurrent request handling**: Multiple requests can execute simultaneously
+- ✅ **Automatic reconnection**: Recovers from transient connection failures
+- ✅ **Connection health**: Detects and replaces broken connections before use
+- ✅ **Resource optimization**: Recycles old connections, closes idle ones
+- ✅ **Production-ready**: Comprehensive error handling and graceful degradation
+
+**Configuration:**
+Set pool parameters in `.env` (all optional, defaults shown above):
+```bash
+DB_POOL_MIN_SIZE=2
+DB_POOL_MAX_SIZE=100
+DB_POOL_MAX_WAITING=50
+DB_POOL_MAX_LIFETIME=1800.0
+DB_POOL_MAX_IDLE=180.0
+DB_POOL_RECONNECT_TIMEOUT=300.0
+DB_POOL_TIMEOUT=30.0
+DB_POOL_NUM_WORKERS=3
+```
 
 ### External Service Integration
 

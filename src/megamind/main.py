@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
+import asyncio
 import io
 import json
 import pandas as pd
@@ -14,6 +15,8 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
+from psycopg_pool import AsyncConnectionPool
+from psycopg.rows import dict_row
 
 from megamind.prompts import build_system_prompt
 from megamind.clients.frappe_client import FrappeClient
@@ -34,26 +37,98 @@ from megamind.models.responses import MainResponse
 from megamind.utils.logger import setup_logging
 from megamind.utils.config import settings
 from megamind.utils.streaming import stream_response_with_ping
+from megamind.utils.database import configure_connection, check_connection
 
 setup_logging()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler for the FastAPI application.
+    Initializes the connection pool and graphs, handles startup and shutdown.
+    """
     logger.info("Starting application lifespan initialization")
 
-    # build the graph
-    async with AsyncPostgresSaver.from_conn_string(
-        settings.supabase_connection_string
-    ) as checkpointer:
-        # First time execution will create the necessary tables
+    pool = None
+    max_retries = 3
+    retry_delay = 2  # seconds
+
+    # Use supabase_db_url if available, otherwise fall back to supabase_connection_string
+    connection_string = (
+        settings.supabase_db_url or settings.supabase_connection_string
+    )
+
+    # Initialize connection pool with retry logic
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(
+                f"Attempting to open database connection pool (attempt {attempt}/{max_retries})..."
+            )
+            logger.debug(
+                f"Pool configuration: min_size={settings.db_pool_min_size}, "
+                f"max_size={settings.db_pool_max_size}, "
+                f"max_waiting={settings.db_pool_max_waiting}, "
+                f"timeout={settings.db_pool_timeout}s"
+            )
+
+            pool = AsyncConnectionPool(
+                conninfo=connection_string,
+                min_size=settings.db_pool_min_size,
+                max_size=settings.db_pool_max_size,
+                max_waiting=settings.db_pool_max_waiting,
+                max_lifetime=settings.db_pool_max_lifetime,
+                max_idle=settings.db_pool_max_idle,
+                reconnect_timeout=settings.db_pool_reconnect_timeout,
+                timeout=settings.db_pool_timeout,
+                num_workers=settings.db_pool_num_workers,
+                kwargs={
+                    "autocommit": True,
+                    "row_factory": dict_row,
+                    "prepare_threshold": 0,
+                    "keepalives": 1,
+                    "keepalives_idle": 30,
+                    "keepalives_interval": 10,
+                    "keepalives_count": 5,
+                },
+                open=False,
+                configure=configure_connection,
+                check=check_connection,
+                reset=False,
+            )
+
+            await pool.open()
+            logger.info("Database connection pool opened successfully")
+            break
+        except Exception as e:
+            logger.error(
+                f"Failed to open database connection pool (attempt {attempt}/{max_retries}): {e}"
+            )
+            if attempt < max_retries:
+                logger.info(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.critical(
+                    "Failed to open database connection pool after all retries. Application cannot start."
+                )
+                raise
+
+    # Initialize checkpointer and graphs with error handling
+    try:
+        logger.info("Initializing checkpointer with connection pool")
+        checkpointer = AsyncPostgresSaver(conn=pool)
+
+        # Setup checkpointer tables
         try:
             logger.info("Setting up checkpointer tables")
             await checkpointer.setup()
             logger.info("Checkpointer tables setup completed")
         except Exception as e:
-            logger.info(f"Could not set up tables: {e}. Assuming they already exist.")
+            logger.warning(
+                f"Could not set up checkpointer tables: {e}. Assuming they already exist."
+            )
 
+        # Build graphs
         logger.info("Building megamind graph")
         document_graph = await build_megamind_graph(checkpointer=checkpointer)
         logger.info("Megamind graph built successfully")
@@ -76,18 +151,37 @@ async def lifespan(app: FastAPI):
         document_extraction_graph = await build_document_extraction_graph()
         logger.info("Document extraction graph built successfully")
 
+        # Store in app state
         app.state.checkpointer = checkpointer
-
+        app.state.pool = pool
         app.state.stock_movement_graph = document_graph
         app.state.document_graph = document_graph
         app.state.role_generation_graph = role_generation_graph
         app.state.wiki_graph = wiki_graph
         app.state.document_search_graph = document_search_graph
         app.state.document_extraction_graph = document_extraction_graph
+        app.state.startup_success = True
 
         logger.info("Application startup completed successfully")
-        yield
-        logger.info("Application shutdown initiated")
+
+    except Exception as e:
+        logger.critical(f"Failed to initialize application: {e}")
+        if pool:
+            await pool.close()
+        raise
+
+    yield
+
+    # Graceful shutdown
+    logger.info("Shutting down application...")
+    try:
+        if pool:
+            logger.info("Closing database connection pool...")
+            await pool.close()
+            logger.info("Database connection pool closed successfully")
+    except Exception as e:
+        logger.error(f"Error closing database connection pool: {e}")
+    logger.info("Application shutdown complete")
 
 
 if settings.sentry_dsn:
