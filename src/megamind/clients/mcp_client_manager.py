@@ -38,6 +38,26 @@ class McpClientManager:
                     },
                 }
 
+            # Neo4J MCP server configuration
+            if (
+                settings.neo4j_uri
+                and settings.neo4j_username
+                and settings.neo4j_password
+            ):
+                servers_config["neo4j"] = {
+                    "command": "uvx",
+                    "args": ["mcp-neo4j-cypher@latest"],
+                    "transport": "stdio",
+                    "env": {
+                        "NEO4J_URI": settings.neo4j_uri,
+                        "NEO4J_USERNAME": settings.neo4j_username,
+                        "NEO4J_PASSWORD": settings.neo4j_password,
+                        # Add unique identifiers to prevent connection conflicts
+                        "NEO4J_DATABASE": "neo4j",
+                        "PROCESS_ID": str(os.getpid()),
+                    },
+                }
+
             if not servers_config:
                 raise RuntimeError(
                     "No MCP servers configured. Please set up at least one MCP server."
