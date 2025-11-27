@@ -49,6 +49,9 @@ FROM python:3.12-slim
 # Install Node.js and npm
 RUN apt-get update && apt-get install -y nodejs npm
 
+# Install uv (Python dependency manager) which includes uvx for Neo4j MCP server
+RUN pip install --no-cache-dir uv
+
 # Create a non-root user
 RUN addgroup --system app && adduser --system --group app
 
