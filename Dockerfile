@@ -53,7 +53,7 @@ RUN apt-get update && apt-get install -y nodejs npm
 RUN pip install --no-cache-dir uv
 
 # Create a non-root user
-RUN addgroup --system app && adduser --system --group app
+RUN addgroup --system app && adduser --system --group --home /home/app app
 
 # Set the working directory
 WORKDIR /app
