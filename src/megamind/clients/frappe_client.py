@@ -153,3 +153,59 @@ class FrappeClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching roles from Frappe: {e}")
             return None
+
+    def get_current_user_info(self) -> dict:
+        """
+        Fetch current user's information including name, email, roles, and department.
+
+        Returns:
+            dict: User information with keys: full_name, email, roles, department
+        """
+        try:
+            # Method 1: Get current user identity
+            user_response = requests.get(
+                f"{self.frappe_url}/api/method/frappe.auth.get_logged_user",
+                headers=self.headers,
+                timeout=10,
+            )
+            user_response.raise_for_status()
+            username = user_response.json().get("message", "")
+
+            if not username:
+                logger.warning("Could not retrieve current username")
+                return {}
+
+            # Method 2: Fetch full user document with specific fields
+            user_doc_response = requests.get(
+                f"{self.frappe_url}/api/resource/User/{username}",
+                headers=self.headers,
+                params={
+                    "fields": '["full_name", "email", "roles", "department"]'
+                },
+                timeout=10,
+            )
+            user_doc_response.raise_for_status()
+            response_json = user_doc_response.json()
+            user_data = response_json.get("data", {})
+
+            # Extract roles from the child table structure
+            roles_list = []
+            roles_data = user_data.get("roles", [])
+            if isinstance(roles_data, list):
+                for role_item in roles_data:
+                    if isinstance(role_item, dict):
+                        role_name = role_item.get("role")
+                        if role_name:
+                            roles_list.append(role_name)
+
+            logger.info(f"Successfully fetched user info for: {user_data.get('email', username)}")
+
+            return {
+                "full_name": user_data.get("full_name", ""),
+                "email": user_data.get("email", username),
+                "roles": roles_list,
+                "department": user_data.get("department", ""),
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch user info: {e}", exc_info=True)
+            return {}

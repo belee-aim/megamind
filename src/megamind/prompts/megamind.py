@@ -9,6 +9,12 @@ BASE_SYSTEM_PROMPT = """# Aimee - AI Assistant for {company}
 
 You are Aimee, an intelligent and proactive assistant specialized in helping with business operations for {company}.
 
+User Information:
+- Name: {user_name}
+- Email: {user_email}
+- Roles: {user_roles}
+- Department: {user_department}
+
 User's default company: {company} (Use this company for all operations necessary unless specified otherwise)
 Current date and time: {current_datetime}
 
@@ -107,7 +113,7 @@ Use `<doc_item>` to display the full, real-time details of a document. This sign
 *   `read_neo4j_cypher(query)`: Execute Cypher queries to navigate the graph.
     *   *Goal*: Reduce tool calls. Fetch the entire workflow or process chain in one query.
     *   *Schema*: Nodes include `BusinessProcess` (end-to-end processes spanning multiple DocTypes), `Workflow` (single DocType workflows), `WorkflowState`, `Role`, `User`, `Transition` (state-to-state changes within a workflow), `DocType`.
-    *   *Example*: `MATCH (w:Workflow {doctype: 'Sales Order'})-[:HAS_STATE]->(s:WorkflowState) RETURN w, s` to see the full lifecycle.
+    *   *Example*: `MATCH (w:Workflow {{doctype: 'Sales Order'}})-[:HAS_STATE]->(s:WorkflowState) RETURN w, s` to see the full lifecycle.
     *   *Business Processes*: Query company-specific custom processes that chain multiple workflows together (e.g., Lead → Opportunity → Quotation → Sales Order → Delivery Note → Sales Invoice → Payment Entry).
 *   `get_neo4j_schema()`: Get the current graph schema (nodes and relationships).
 
@@ -196,6 +202,10 @@ Ask for clarification if needed, but try to answer from the Knowledge Graph firs
 def build_system_prompt(
     company: str,
     current_datetime: str,
+    user_name: str = "",
+    user_email: str = "",
+    user_roles: list[str] = None,
+    user_department: str = "",
 ) -> str:
     """
     Build the complete system prompt with runtime values.
@@ -203,11 +213,31 @@ def build_system_prompt(
     Args:
         company: Company name from the system
         current_datetime: Current datetime string
+        user_name: User's full name
+        user_email: User's email address
+        user_roles: List of user's roles
+        user_department: User's department
 
     Returns:
         Complete system prompt ready for use
     """
+    if user_roles is None:
+        user_roles = []
+
+    # Escape curly braces in user input to prevent format errors
+    def escape_braces(text: str) -> str:
+        """Escape curly braces in text to prevent format string issues."""
+        return text.replace("{", "{{").replace("}", "}}")
+
+    # Format roles as comma-separated string and escape
+    roles_str = ", ".join(user_roles) if user_roles else "N/A"
+    roles_str = escape_braces(roles_str)
+
     return BASE_SYSTEM_PROMPT.format(
-        company=company,
-        current_datetime=current_datetime,
+        company=escape_braces(company or "N/A"),
+        current_datetime=escape_braces(current_datetime),
+        user_name=escape_braces(user_name or "N/A"),
+        user_email=escape_braces(user_email or "N/A"),
+        user_roles=roles_str,
+        user_department=escape_braces(user_department or "N/A"),
     )

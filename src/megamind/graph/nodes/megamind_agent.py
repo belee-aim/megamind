@@ -35,7 +35,7 @@ def sanitize_messages_for_claude(messages: list) -> list:
 
     for i, msg in enumerate(messages):
         # Check if this is an AI message with tool calls
-        if isinstance(msg, AIMessage) and hasattr(msg, 'tool_calls') and msg.tool_calls:
+        if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
             # Check if next message(s) are tool results
             has_tool_results = False
 
@@ -56,7 +56,7 @@ def sanitize_messages_for_claude(messages: list) -> list:
                 # Create a copy of the message without tool_calls
                 clean_msg = AIMessage(
                     content=msg.content,
-                    id=msg.id if hasattr(msg, 'id') else None,
+                    id=msg.id if hasattr(msg, "id") else None,
                 )
                 sanitized.append(clean_msg)
         else:
@@ -107,6 +107,8 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
         access_token = state.get("access_token")
         for tool_call in response.tool_calls:
             tool_name = tool_call.get("name")
+            if "neo4j" in tool_name:
+                continue  # Skip neo4j tools
             if any(tool.name == tool_name for tool in mcp_tools):
                 tool_call["args"]["user_token"] = access_token
 

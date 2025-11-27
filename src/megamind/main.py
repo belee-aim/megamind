@@ -285,15 +285,21 @@ async def _handle_chat_stream(
             # Get runtime values
             frappe_client = FrappeClient(access_token=access_token)
             company = frappe_client.get_default_company()
+            user_info = frappe_client.get_current_user_info()
             current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 
             logger.debug(f"Using company: {company}")
+            logger.info(f"User context loaded: {user_info.get('full_name', 'Unknown')} ({user_info.get('email', 'Unknown')})")
             logger.debug(f"Current datetime: {current_datetime}")
 
-            # Build system prompt (knowledge will be retrieved by LLM via tools)
+            # Build system prompt with user information (knowledge will be retrieved by LLM via tools)
             system_prompt = build_system_prompt(
                 company=company,
                 current_datetime=current_datetime,
+                user_name=user_info.get("full_name", ""),
+                user_email=user_info.get("email", ""),
+                user_roles=user_info.get("roles", []),
+                user_department=user_info.get("department", ""),
             )
             messages.append(SystemMessage(content=system_prompt))
             logger.debug(f"System prompt built for thread: {thread}")
