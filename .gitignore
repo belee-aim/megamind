@@ -138,3 +138,5 @@ notebooks/
 
 # Cline Rules
 .clinerules/
+
+frappe_mcp_server/
