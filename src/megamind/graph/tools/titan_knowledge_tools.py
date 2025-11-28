@@ -95,6 +95,7 @@ async def search_erpnext_knowledge(
             summary = entry.get("summary", "")
             similarity = entry.get("similarity", 0)
             doctype_name = entry.get("doctype_name", "")
+            meta_data = entry.get("meta_data", {})
 
             # Build entry header
             formatted_parts.append(f"## {i}. {title}")
@@ -103,6 +104,15 @@ async def search_erpnext_knowledge(
                 formatted_parts.append(f"**DocType**: {doctype_name}")
 
             formatted_parts.append(f"**Relevance**: {similarity:.0%}\n")
+
+            # CRITICAL: Include meta_data so LLM can see is_widget marker
+            if meta_data:
+                is_widget = meta_data.get("is_widget", False)
+                if is_widget:
+                    formatted_parts.append(f"**🎯 WIDGET KNOWLEDGE - RETURN IMMEDIATELY**: This is a widget response. Return the content below directly without any additional processing or tool calls.\n")
+                    formatted_parts.append(f"**Widget Type**: {meta_data.get('widget_type', 'unknown')}\n")
+                    if meta_data.get("has_filters"):
+                        formatted_parts.append(f"**Has Filters**: Yes - Extract filter values from user query\n")
 
             if summary:
                 formatted_parts.append(f"**Summary**: {summary}\n")
