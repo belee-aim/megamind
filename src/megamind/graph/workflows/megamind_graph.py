@@ -13,6 +13,14 @@ from megamind.graph.tools.titan_knowledge_tools import (
     search_erpnext_knowledge,
     get_erpnext_knowledge_by_id,
 )
+from megamind.graph.tools.minion_tools import (
+    search_processes,
+    search_workflows,
+    get_process_definition,
+    get_workflow_definition,
+    query_workflow_next_steps,
+    query_workflow_available_actions,
+)
 
 interrupt_keywords = [
     "create",
@@ -25,7 +33,7 @@ interrupt_keywords = [
 def route_tools_from_rag(state: AgentState) -> str:
     """
     Routes to the appropriate tool node based on the agent's decision.
-    Titan knowledge search tools bypass consent checks (read-only).
+    Knowledge and process query tools bypass consent checks (read-only).
     """
     if (
         "messages" not in state
@@ -40,8 +48,18 @@ def route_tools_from_rag(state: AgentState) -> str:
 
     tool_name = last_message.tool_calls[0]["name"]
 
-    # Titan knowledge tools are read-only, bypass consent
-    if tool_name in ["search_erpnext_knowledge", "get_erpnext_knowledge_by_id"]:
+    # Knowledge and process query tools are read-only, bypass consent
+    knowledge_tools = [
+        "search_erpnext_knowledge",
+        "get_erpnext_knowledge_by_id",
+        "search_processes",
+        "search_workflows",
+        "get_process_definition",
+        "get_workflow_definition",
+        "query_workflow_next_steps",
+        "query_workflow_available_actions",
+    ]
+    if tool_name in knowledge_tools:
         return "mcp_tools"
 
     # Check if MCP tool requires consent
@@ -72,10 +90,18 @@ async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
     # Add nodes
     workflow.add_node("megamind_agent_node", megamind_agent_node)
 
-    # Combine MCP tools with Titan knowledge search tools
+    # Combine MCP tools with Titan knowledge search tools and Minion tools
     mcp_tools = await mcp_client.get_tools()
     titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
-    all_tools = mcp_tools + titan_tools
+    minion_tools = [
+        search_processes,
+        search_workflows,
+        get_process_definition,
+        get_workflow_definition,
+        query_workflow_next_steps,
+        query_workflow_available_actions,
+    ]
+    all_tools = mcp_tools + titan_tools + minion_tools
 
     workflow.add_node("mcp_tools", ToolNode(all_tools))
     workflow.add_node("corrective_rag_node", corrective_rag_node)

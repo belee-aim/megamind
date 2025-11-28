@@ -61,11 +61,6 @@ class Settings(BaseSettings):
     firebase_database_url: str = ""
     firebase_credentials_base64: str = ""
 
-    # Neo4J Configuration
-    neo4j_uri: str = "bolt://localhost:7688"
-    neo4j_username: str = "neo4j"
-    neo4j_password: str = "neo4j_password"
-
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

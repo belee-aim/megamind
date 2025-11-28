@@ -9,6 +9,14 @@ from megamind.graph.tools.titan_knowledge_tools import (
     search_erpnext_knowledge,
     get_erpnext_knowledge_by_id,
 )
+from megamind.graph.tools.minion_tools import (
+    search_processes,
+    search_workflows,
+    get_process_definition,
+    get_workflow_definition,
+    query_workflow_next_steps,
+    query_workflow_available_actions,
+)
 
 from ..states import AgentState
 
@@ -89,7 +97,18 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
 
     # Add Titan knowledge search tools
     titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
-    all_tools = mcp_tools + titan_tools
+
+    # Add Minion process/workflow tools
+    minion_tools = [
+        search_processes,
+        search_workflows,
+        get_process_definition,
+        get_workflow_definition,
+        query_workflow_next_steps,
+        query_workflow_available_actions,
+    ]
+
+    all_tools = mcp_tools + titan_tools + minion_tools
 
     # Track LLM invocation time
     llm_start = time.time()
@@ -107,8 +126,6 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
         access_token = state.get("access_token")
         for tool_call in response.tool_calls:
             tool_name = tool_call.get("name")
-            if "neo4j" in tool_name:
-                continue  # Skip neo4j tools
             if any(tool.name == tool_name for tool in mcp_tools):
                 tool_call["args"]["user_token"] = access_token
 
