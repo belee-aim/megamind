@@ -109,7 +109,11 @@ async def search_erpnext_knowledge(
             if meta_data:
                 is_widget = meta_data.get("is_widget", False)
                 if is_widget:
-                    formatted_parts.append(f"**🎯 WIDGET KNOWLEDGE - RETURN IMMEDIATELY**: This is a widget response. Return the content below directly without any additional processing or tool calls.\n")
+                    formatted_parts.append(
+                        "**🎯 WIDGET KNOWLEDGE - RETURN IMMEDIATELY**: "
+                        "This is a widget response. Return the content below directly "
+                        "without any additional processing or tool calls.\n"
+                    )
                     formatted_parts.append(f"**Widget Type**: {meta_data.get('widget_type', 'unknown')}\n")
                     if meta_data.get("has_filters"):
                         formatted_parts.append(f"**Has Filters**: Yes - Extract filter values from user query\n")
