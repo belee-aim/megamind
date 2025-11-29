@@ -66,7 +66,7 @@ When `search_erpnext_knowledge` returns knowledge with `meta_data.is_widget: tru
 4. **DO NOT** fetch additional data
 
 **Widget Response Format:**
-The knowledge `content` field contains ready-to-use XML. Return it exactly as provided:
+The knowledge `content` field contains the widget XML structure. Return it with any required filters extracted from the user's query and added to `<user_filters>`:
 
 ```xml
 <function>
