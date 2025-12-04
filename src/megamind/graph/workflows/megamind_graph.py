@@ -1,144 +1,157 @@
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
+from langgraph.types import Send
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from typing import List
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
-from megamind.graph.nodes.human_in_the_loop import user_consent_node
-from megamind.graph.nodes.megamind_agent import megamind_agent_node
-from megamind.graph.nodes.corrective_rag_node import corrective_rag_node
 from megamind.graph.states import AgentState
+
+# Import nodes
+from megamind.graph.nodes.orchestrator import orchestrator_node
+from megamind.graph.nodes.planner import planner_node
+from megamind.graph.nodes.synthesizer import synthesizer_node
 from megamind.graph.nodes.knowledge_capture_node import knowledge_capture_node
-from megamind.graph.tools.titan_knowledge_tools import (
-    search_erpnext_knowledge,
-    get_erpnext_knowledge_by_id,
-)
-from megamind.graph.tools.minion_tools import (
-    search_processes,
-    search_workflows,
-    get_process_definition,
-    get_workflow_definition,
-    query_workflow_next_steps,
-    query_workflow_available_actions,
-)
 
-interrupt_keywords = [
-    "create",
-    "update",
-    "delete",
-    "apply_workflow",
-]
+# Import subagents
+from megamind.graph.agents.business_process_analyst import business_process_analyst
+from megamind.graph.agents.workflow_analyst import workflow_analyst
+from megamind.graph.agents.report_analyst import report_analyst
+from megamind.graph.agents.system_specialist import system_specialist
+from megamind.graph.agents.transaction_specialist import transaction_specialist
 
 
-def route_tools_from_rag(state: AgentState) -> str:
+SPECIALIST_MAP = {
+    "business_process": "business_process_analyst",
+    "workflow": "workflow_analyst",
+    "report": "report_analyst",
+    "system": "system_specialist",
+    "transaction": "transaction_specialist",
+}
+
+
+def route_after_orchestrator(state: AgentState) -> str | List[Send]:
     """
-    Routes to the appropriate tool node based on the agent's decision.
-    Knowledge and process query tools bypass consent checks (read-only).
+    Routes from Orchestrator based on its decision.
+    Supports parallel execution via Send().
     """
-    if (
-        "messages" not in state
-        or not isinstance(state["messages"], list)
-        or len(state["messages"]) == 0
-    ):
+    next_action = state.get("next_action")
+
+    if next_action == "plan":
+        return "planner_node"
+    elif next_action == "parallel":
+        # Send to multiple specialists in parallel
+        pending = state.get("pending_specialists", [])
+        if pending:
+            return [
+                Send(SPECIALIST_MAP[s], state) for s in pending if s in SPECIALIST_MAP
+            ]
+        return END
+    elif next_action == "route":
+        target = state.get("target_specialist")
+        return SPECIALIST_MAP.get(target, END)
+    else:  # "respond" or unknown
         return END
 
-    last_message = state["messages"][-1]
-    if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+
+def route_after_planner(state: AgentState) -> str | List[Send]:
+    """
+    Routes from Planner to specialists.
+    Supports parallel execution for first group.
+    """
+    next_action = state.get("next_action")
+
+    if next_action == "parallel":
+        pending = state.get("pending_specialists", [])
+        if pending:
+            return [
+                Send(SPECIALIST_MAP[s], state) for s in pending if s in SPECIALIST_MAP
+            ]
         return END
-
-    tool_name = last_message.tool_calls[0]["name"]
-
-    # Knowledge and process query tools are read-only, bypass consent
-    knowledge_tools = [
-        "search_erpnext_knowledge",
-        "get_erpnext_knowledge_by_id",
-        "search_processes",
-        "search_workflows",
-        "get_process_definition",
-        "get_workflow_definition",
-        "query_workflow_next_steps",
-        "query_workflow_available_actions",
-    ]
-    if tool_name in knowledge_tools:
-        return "mcp_tools"
-
-    # Check if MCP tool requires consent
-    if any(keyword in tool_name.lower() for keyword in interrupt_keywords):
-        return "user_consent_node"
-
-    return "mcp_tools"
-
-
-def after_consent(state: AgentState) -> str:
-    """
-    Routes to the next node based on the user's consent.
-    """
-    if state.get("user_consent_response") == "approved":
-        return "mcp_tools"
+    elif next_action == "route":
+        target = state.get("target_specialist")
+        return SPECIALIST_MAP.get(target, END)
     else:
-        return "megamind_agent_node"
+        return END
+
+
+def route_after_synthesizer(state: AgentState) -> str | List[Send]:
+    """
+    Routes from Synthesizer.
+    - If more groups, route to next group (potentially parallel)
+    - Otherwise, end
+    """
+    next_action = state.get("next_action")
+
+    if next_action == "parallel":
+        pending = state.get("pending_specialists", [])
+        if pending:
+            return [
+                Send(SPECIALIST_MAP[s], state) for s in pending if s in SPECIALIST_MAP
+            ]
+        return END
+    elif next_action == "route":
+        target = state.get("target_specialist")
+        return SPECIALIST_MAP.get(target, END)
+    else:
+        return END
 
 
 async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
     """
-    Builds and compiles the LangGraph for the RAG agent.
+    Builds the LangGraph for the Multi-Agent system.
+
+    Architecture:
+    - Orchestrator analyzes and decides: plan, route, parallel, or respond
+    - Planner creates multi-step execution plans with parallel grouping
+    - Subagents execute specific tasks (can run in parallel)
+    - Synthesizer combines results and advances to next group
     """
     client_manager.initialize_client()
     workflow = StateGraph(AgentState, config_schema=Configuration)
-    mcp_client = client_manager.get_client()
 
-    # Add nodes
-    workflow.add_node("megamind_agent_node", megamind_agent_node)
+    # Add core nodes
+    workflow.add_node("orchestrator_node", orchestrator_node)
+    workflow.add_node("planner_node", planner_node)
+    workflow.add_node("synthesizer_node", synthesizer_node)
 
-    # Combine MCP tools with Titan knowledge search tools and Minion tools
-    mcp_tools = await mcp_client.get_tools()
-    titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
-    minion_tools = [
-        search_processes,
-        search_workflows,
-        get_process_definition,
-        get_workflow_definition,
-        query_workflow_next_steps,
-        query_workflow_available_actions,
-    ]
-    all_tools = mcp_tools + titan_tools + minion_tools
+    # Add subagent nodes
+    workflow.add_node("business_process_analyst", business_process_analyst)
+    workflow.add_node("workflow_analyst", workflow_analyst)
+    workflow.add_node("report_analyst", report_analyst)
+    workflow.add_node("system_specialist", system_specialist)
+    workflow.add_node("transaction_specialist", transaction_specialist)
 
-    workflow.add_node("mcp_tools", ToolNode(all_tools))
-    workflow.add_node("corrective_rag_node", corrective_rag_node)
+    # Optional: Knowledge capture
     workflow.add_node("knowledge_capture_node", knowledge_capture_node)
-    workflow.add_node("user_consent_node", user_consent_node)
 
-    # Set the entry point
-    workflow.set_entry_point("megamind_agent_node")
+    # Set entry point
+    workflow.set_entry_point("orchestrator_node")
 
+    # Orchestrator routing (supports parallel via Send)
     workflow.add_conditional_edges(
-        "megamind_agent_node",
-        route_tools_from_rag,
-        {
-            "mcp_tools": "mcp_tools",
-            "user_consent_node": "user_consent_node",
-            END: "knowledge_capture_node",
-        },
+        "orchestrator_node",
+        route_after_orchestrator,
     )
 
-    # Add edges
+    # Planner routing (supports parallel via Send)
     workflow.add_conditional_edges(
-        "user_consent_node",
-        after_consent,
-        {
-            "mcp_tools": "mcp_tools",
-            "megamind_agent_node": "megamind_agent_node",
-        },
+        "planner_node",
+        route_after_planner,
     )
 
-    # CRAG: Route tool results through corrective analysis before returning to agent
-    # Temporarily disabled CRAG
-    # workflow.add_edge("mcp_tools", "corrective_rag_node")
-    # workflow.add_edge("corrective_rag_node", "megamind_agent_node")
-    # workflow.add_edge("knowledge_capture_node", END)
+    # All subagents go to synthesizer
+    workflow.add_edge("business_process_analyst", "synthesizer_node")
+    workflow.add_edge("workflow_analyst", "synthesizer_node")
+    workflow.add_edge("report_analyst", "synthesizer_node")
+    workflow.add_edge("system_specialist", "synthesizer_node")
+    workflow.add_edge("transaction_specialist", "synthesizer_node")
 
-    workflow.add_edge("mcp_tools", "megamind_agent_node")
-    workflow.add_edge("knowledge_capture_node", END)
+    # Synthesizer routing (supports parallel for next group)
+    workflow.add_conditional_edges(
+        "synthesizer_node",
+        route_after_synthesizer,
+    )
 
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

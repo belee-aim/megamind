@@ -9,6 +9,22 @@ class AgentState(TypedDict):
     access_token: str | None
     user_consent_response: str | None
 
+    # Orchestrator routing fields
+    next_action: str | None  # "plan", "route", "parallel", "respond", "synthesize"
+    target_specialist: (
+        str | None
+    )  # "business_process", "workflow", "report", "system", "transaction"
+    current_plan: List[Dict[str, Any]] | None  # Plan steps from Planner
+    plan_step_index: int | None  # Current step being executed
+    specialist_results: List[str] | None  # Results from subagent executions
+
+    # Parallel execution fields
+    execution_groups: (
+        List[List[Dict[str, Any]]] | None
+    )  # Grouped steps for parallel execution
+    current_group_index: int | None  # Current group being executed
+    pending_specialists: List[str] | None  # Specialists pending in current group
+
     # Enhanced stock movement agent state fields
     validation_context: Dict[str, Any] | None
     workflow_state: Dict[str, Any] | None
