@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     firebase_database_url: str = ""
     firebase_credentials_base64: str = ""
 
+    # Zep Configuration
+    zep_api_key: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

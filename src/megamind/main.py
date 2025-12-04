@@ -10,16 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
-from psycopg_pool import AsyncConnectionPool
-from psycopg.rows import dict_row
 
 from megamind.prompts import build_system_prompt
 from megamind.clients.frappe_client import FrappeClient
+from megamind.clients.zep_client import get_zep_client
+from megamind.clients.zep_checkpoint_saver import ZepCheckpointSaver
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.megamind_graph import build_megamind_graph
 from megamind.graph.workflows.role_generation_graph import (
@@ -32,12 +31,12 @@ from megamind.graph.workflows.document_extraction_graph import (
 )
 from megamind.api.v1.minion import router as minion_router
 from megamind.api.v1.document_extraction import router as document_extraction_router
+from megamind.api.v1.zep import router as zep_router
 from megamind.models.requests import ChatRequest, RoleGenerationRequest
 from megamind.models.responses import MainResponse
 from megamind.utils.logger import setup_logging
 from megamind.utils.config import settings
 from megamind.utils.streaming import stream_response_with_ping
-from megamind.utils.database import configure_connection, check_connection
 
 setup_logging()
 
@@ -50,81 +49,18 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting application lifespan initialization")
 
-    pool = None
-    max_retries = 3
-    retry_delay = 2  # seconds
-
-    # Use supabase_db_url if available, otherwise fall back to supabase_connection_string
-    connection_string = settings.supabase_db_url or settings.supabase_connection_string
-
-    # Initialize connection pool with retry logic
-    for attempt in range(1, max_retries + 1):
-        try:
-            logger.info(
-                f"Attempting to open database connection pool (attempt {attempt}/{max_retries})..."
-            )
-            logger.debug(
-                f"Pool configuration: min_size={settings.db_pool_min_size}, "
-                f"max_size={settings.db_pool_max_size}, "
-                f"max_waiting={settings.db_pool_max_waiting}, "
-                f"timeout={settings.db_pool_timeout}s"
-            )
-
-            pool = AsyncConnectionPool(
-                conninfo=connection_string,
-                min_size=settings.db_pool_min_size,
-                max_size=settings.db_pool_max_size,
-                max_waiting=settings.db_pool_max_waiting,
-                max_lifetime=settings.db_pool_max_lifetime,
-                max_idle=settings.db_pool_max_idle,
-                reconnect_timeout=settings.db_pool_reconnect_timeout,
-                timeout=settings.db_pool_timeout,
-                num_workers=settings.db_pool_num_workers,
-                kwargs={
-                    "autocommit": True,
-                    "row_factory": dict_row,
-                    "prepare_threshold": 0,
-                    "keepalives": 1,
-                    "keepalives_idle": 30,
-                    "keepalives_interval": 10,
-                    "keepalives_count": 5,
-                },
-                open=False,
-                configure=configure_connection,
-                check=check_connection,
-                reset=False,
-            )
-
-            await pool.open()
-            logger.info("Database connection pool opened successfully")
-            break
-        except Exception as e:
-            logger.error(
-                f"Failed to open database connection pool (attempt {attempt}/{max_retries}): {e}"
-            )
-            if attempt < max_retries:
-                logger.info(f"Retrying in {retry_delay} seconds...")
-                await asyncio.sleep(retry_delay)
-            else:
-                logger.critical(
-                    "Failed to open database connection pool after all retries. Application cannot start."
-                )
-                raise
-
-    # Initialize checkpointer and graphs with error handling
+    # Initialize Zep checkpointer
     try:
-        logger.info("Initializing checkpointer with connection pool")
-        checkpointer = AsyncPostgresSaver(conn=pool)
+        logger.info("Initializing Zep checkpointer")
+        zep_client = get_zep_client()
 
-        # Setup checkpointer tables
-        try:
-            logger.info("Setting up checkpointer tables")
-            await checkpointer.setup()
-            logger.info("Checkpointer tables setup completed")
-        except Exception as e:
-            logger.warning(
-                f"Could not set up checkpointer tables: {e}. Assuming they already exist."
-            )
+        if not zep_client.is_available():
+            logger.error("Zep client not configured. ZEP_API_KEY is required for checkpointer.")
+            raise RuntimeError("ZEP_API_KEY is required for checkpointer. Please set it in .env file.")
+
+        checkpointer = ZepCheckpointSaver(zep_client=zep_client)
+        await checkpointer.setup()  # No-op for Zep, but maintains interface
+        logger.info("Zep checkpointer initialized successfully")
 
         # Build graphs
         logger.info("Building megamind graph")
@@ -164,21 +100,13 @@ async def lifespan(app: FastAPI):
 
     except Exception as e:
         logger.critical(f"Failed to initialize application: {e}")
-        if pool:
-            await pool.close()
         raise
 
     yield
 
     # Graceful shutdown
     logger.info("Shutting down application...")
-    try:
-        if pool:
-            logger.info("Closing database connection pool...")
-            await pool.close()
-            logger.info("Database connection pool closed successfully")
-    except Exception as e:
-        logger.error(f"Error closing database connection pool: {e}")
+    # No cleanup needed for Zep (cloud-based)
     logger.info("Application shutdown complete")
 
 
@@ -219,6 +147,7 @@ app.include_router(minion_router, prefix="/api/v1", tags=["Minion"])
 app.include_router(
     document_extraction_router, prefix="/api/v1", tags=["Document Extraction"]
 )
+app.include_router(zep_router, prefix="/api/v1", tags=["Zep Memory"])
 
 app.mount("/static", StaticFiles(directory="src/megamind/static"), name="static")
 
@@ -262,7 +191,8 @@ async def _handle_chat_stream(
 ):
     """
     Handles the common logic for streaming chat responses.
-    Knowledge retrieval is now handled by the LLM via tools.
+    Knowledge retrieval is handled by the LLM via tools.
+    State persistence handled by Zep checkpointer.
     """
     logger.info(f"Handling chat stream for thread={thread}")
 
@@ -274,7 +204,7 @@ async def _handle_chat_stream(
         config = RunnableConfig(configurable={"thread_id": thread})
 
         access_token = get_token_from_header(request)
-        checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
+        checkpointer = request.app.state.checkpointer
         thread_state = await checkpointer.aget(config)
         messages = []
 
@@ -444,6 +374,107 @@ async def get_thread_state(
             status_code=500,
             content=MainResponse(
                 message="Error", error=f"Failed to check thread state: {str(e)}"
+            ).model_dump(),
+        )
+
+
+@app.get("/api/v1/threads/{thread_id}/history")
+async def get_thread_history(
+    request: Request,
+    thread_id: str,
+    limit: int = 50,
+):
+    """
+    Retrieve conversation history for a thread from PostgreSQL checkpointer.
+    Returns all messages in chronological order.
+    """
+    try:
+        logger.debug(f"Retrieving history for thread: {thread_id}")
+
+        # Get checkpointer and config
+        checkpointer: AsyncPostgresSaver = request.app.state.checkpointer
+        config = RunnableConfig(configurable={"thread_id": thread_id})
+
+        # Get thread state from checkpointer
+        thread_state = await checkpointer.aget(config)
+
+        if thread_state is None:
+            raise HTTPException(
+                status_code=404, detail=f"Thread {thread_id} not found"
+            )
+
+        # Extract messages from state
+        messages = thread_state.get("channel_values", {}).get("messages", [])
+
+        # Convert messages to serializable format
+        history = []
+        for msg in messages[-limit:]:  # Get last N messages
+            if isinstance(msg, SystemMessage):
+                history.append(
+                    {
+                        "role": "system",
+                        "content": msg.content,
+                        "type": "system",
+                    }
+                )
+            elif isinstance(msg, HumanMessage):
+                history.append(
+                    {
+                        "role": "user",
+                        "content": msg.content,
+                        "type": "human",
+                    }
+                )
+            elif isinstance(msg, AIMessage):
+                history.append(
+                    {
+                        "role": "assistant",
+                        "content": msg.content,
+                        "type": "ai",
+                        "tool_calls": (
+                            [
+                                {
+                                    "id": tc.get("id"),
+                                    "name": tc.get("name"),
+                                    "args": tc.get("args"),
+                                }
+                                for tc in (msg.tool_calls or [])
+                            ]
+                            if hasattr(msg, "tool_calls") and msg.tool_calls
+                            else None
+                        ),
+                    }
+                )
+            elif isinstance(msg, ToolMessage):
+                history.append(
+                    {
+                        "role": "tool",
+                        "content": msg.content,
+                        "type": "tool",
+                        "tool_call_id": msg.tool_call_id,
+                    }
+                )
+
+        logger.info(f"Retrieved {len(history)} messages for thread {thread_id}")
+
+        return MainResponse(
+            message=f"Retrieved {len(history)} messages",
+            response={
+                "thread_id": thread_id,
+                "messages": history,
+                "count": len(history),
+            },
+        ).model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving thread history: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=MainResponse(
+                message="Error",
+                error=f"Failed to retrieve thread history: {str(e)}",
             ).model_dump(),
         )
 

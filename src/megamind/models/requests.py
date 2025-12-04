@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 
 from megamind.graph.schemas import InterruptResponse
@@ -30,3 +30,42 @@ class DocumentExtractionRequest(BaseModel):
 
 class TitanCallbackRequest(BaseModel):
     documents: list[str]
+
+
+# === ZEP MANAGEMENT REQUESTS ===
+
+
+class ZepUserCreateRequest(BaseModel):
+    user_id: str
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class ZepUserUpdateRequest(BaseModel):
+    email: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class ZepThreadCreateRequest(BaseModel):
+    thread_id: str
+    user_id: str
+    metadata: Optional[dict] = None
+
+
+class ZepThreadUpdateRequest(BaseModel):
+    metadata: Optional[dict] = None
+
+
+class ZepMessageAddRequest(BaseModel):
+    thread_id: str
+    messages: List[dict]  # List of {role, content, name?}
+
+
+class ZepMemorySearchRequest(BaseModel):
+    thread_id: str
+    query: str
+    limit: int = 5
