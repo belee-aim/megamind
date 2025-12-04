@@ -5,7 +5,7 @@ from megamind.graph.schemas import InterruptResponse
 
 
 class ChatRequest(BaseModel):
-    question: Optional[str] = None
+    query: Optional[str] = None
     company: Optional[str] = None
     interrupt_response: Optional[InterruptResponse] = None
 
@@ -16,7 +16,7 @@ class RoleGenerationRequest(BaseModel):
 
 
 class MinionRequest(BaseModel):
-    question: str
+    query: str
 
 
 class DocumentRequestBody(BaseModel):
