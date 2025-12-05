@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
-import asyncio
 import io
 import json
 import pandas as pd
@@ -14,11 +13,12 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 
 from megamind.prompts import build_system_prompt
 from megamind.clients.frappe_client import FrappeClient
 from megamind.clients.zep_client import get_zep_client
-from megamind.clients.zep_checkpoint_saver import ZepCheckpointSaver
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.megamind_graph import build_megamind_graph
 from megamind.graph.workflows.role_generation_graph import (
@@ -45,22 +45,44 @@ setup_logging()
 async def lifespan(app: FastAPI):
     """
     Lifespan event handler for the FastAPI application.
-    Initializes the connection pool and graphs, handles startup and shutdown.
+    Initializes the connection pool, PostgresSaver checkpointer, and graphs.
     """
     logger.info("Starting application lifespan initialization")
 
-    # Initialize Zep checkpointer
+    # Initialize PostgreSQL connection pool
+    db_url = settings.supabase_db_url or settings.supabase_connection_string
+    logger.info("Initializing PostgreSQL connection pool")
+
+    pool = AsyncConnectionPool(
+        conninfo=db_url,
+        min_size=settings.db_pool_min_size,
+        max_size=settings.db_pool_max_size,
+        max_waiting=settings.db_pool_max_waiting,
+        max_lifetime=settings.db_pool_max_lifetime,
+        max_idle=settings.db_pool_max_idle,
+        reconnect_timeout=settings.db_pool_reconnect_timeout,
+        timeout=settings.db_pool_timeout,
+        num_workers=settings.db_pool_num_workers,
+        open=False,
+    )
+
     try:
-        logger.info("Initializing Zep checkpointer")
+        await pool.open()
+        logger.info("PostgreSQL connection pool opened successfully")
+
+        # Initialize PostgresSaver checkpointer
+        checkpointer = AsyncPostgresSaver(pool)
+        await checkpointer.setup()
+        logger.info("PostgresSaver checkpointer initialized successfully")
+
+        # Initialize Zep client for Knowledge Graph (optional)
         zep_client = get_zep_client()
-
-        if not zep_client.is_available():
-            logger.error("Zep client not configured. ZEP_API_KEY is required for checkpointer.")
-            raise RuntimeError("ZEP_API_KEY is required for checkpointer. Please set it in .env file.")
-
-        checkpointer = ZepCheckpointSaver(zep_client=zep_client)
-        await checkpointer.setup()  # No-op for Zep, but maintains interface
-        logger.info("Zep checkpointer initialized successfully")
+        if zep_client.is_available():
+            logger.info("Zep client available for Knowledge Graph features")
+        else:
+            logger.warning(
+                "Zep client not configured. Knowledge Graph features disabled."
+            )
 
         # Build graphs
         logger.info("Building megamind graph")
@@ -86,8 +108,9 @@ async def lifespan(app: FastAPI):
         logger.info("Document extraction graph built successfully")
 
         # Store in app state
-        app.state.checkpointer = checkpointer
         app.state.pool = pool
+        app.state.checkpointer = checkpointer
+        app.state.zep_client = zep_client
         app.state.stock_movement_graph = document_graph
         app.state.document_graph = document_graph
         app.state.role_generation_graph = role_generation_graph
@@ -100,13 +123,15 @@ async def lifespan(app: FastAPI):
 
     except Exception as e:
         logger.critical(f"Failed to initialize application: {e}")
+        await pool.close()
         raise
 
     yield
 
     # Graceful shutdown
     logger.info("Shutting down application...")
-    # No cleanup needed for Zep (cloud-based)
+    await pool.close()
+    logger.info("PostgreSQL connection pool closed")
     logger.info("Application shutdown complete")
 
 
@@ -192,7 +217,8 @@ async def _handle_chat_stream(
     """
     Handles the common logic for streaming chat responses.
     Knowledge retrieval is handled by the LLM via tools.
-    State persistence handled by Zep checkpointer.
+    State persistence handled by PostgresSaver checkpointer.
+    Messages synced to Zep for knowledge graph features.
     """
     logger.info(f"Handling chat stream for thread={thread}")
 
@@ -205,8 +231,33 @@ async def _handle_chat_stream(
 
         access_token = get_token_from_header(request)
         checkpointer = request.app.state.checkpointer
+        zep_client = request.app.state.zep_client
         thread_state = await checkpointer.aget(config)
         messages = []
+
+        # Get user info for Zep user management
+        user_id = None
+        if zep_client.is_available():
+            try:
+                frappe_client = FrappeClient(access_token=access_token)
+                user_info = frappe_client.get_current_user_info()
+                user_id = user_info.get("email") or user_info.get("name")
+
+                # Ensure user and thread exist in Zep
+                if user_id:
+                    await zep_client.get_or_create_user(
+                        user_id=user_id,
+                        email=user_info.get("email", ""),
+                        first_name=user_info.get("first_name", ""),
+                        last_name=user_info.get("last_name", ""),
+                    )
+                    await zep_client.get_or_create_thread(
+                        thread_id=thread,
+                        user_id=user_id,
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to setup Zep user/thread: {e}")
+                user_id = None
 
         # Initialize system prompt if it's a new thread
         if thread_state is None:
@@ -219,7 +270,9 @@ async def _handle_chat_stream(
             current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 
             logger.debug(f"Using company: {company}")
-            logger.info(f"User context loaded: {user_info.get('full_name', 'Unknown')} ({user_info.get('email', 'Unknown')})")
+            logger.info(
+                f"User context loaded: {user_info.get('full_name', 'Unknown')} ({user_info.get('email', 'Unknown')})"
+            )
             logger.debug(f"Current datetime: {current_datetime}")
 
             # Build system prompt with user information (knowledge will be retrieved by LLM via tools)
@@ -259,9 +312,21 @@ async def _handle_chat_stream(
             )
 
         # Add user's question to the message list
-        if request_data.question:
+        if request_data.query:
             logger.debug(f"Processing user question for thread: {thread}")
-            messages.append(HumanMessage(content=request_data.question))
+            messages.append(HumanMessage(content=request_data.query))
+
+            # Sync user message to Zep (fire and forget)
+            if zep_client.is_available() and user_id:
+                try:
+                    await zep_client.add_message(
+                        thread_id=thread,
+                        role="user",
+                        content=request_data.query,
+                    )
+                    logger.debug(f"Synced user message to Zep thread: {thread}")
+                except Exception as e:
+                    logger.warning(f"Failed to sync user message to Zep: {e}")
 
         inputs = {
             "messages": messages,
@@ -271,7 +336,12 @@ async def _handle_chat_stream(
 
         logger.debug(f"Starting stream for thread: {thread}")
         return await stream_response_with_ping(
-            graph, inputs, config, provider=settings.provider
+            graph,
+            inputs,
+            config,
+            provider=settings.provider,
+            zep_client=zep_client if zep_client.is_available() else None,
+            zep_thread_id=thread,
         )
 
     except HTTPException as e:
@@ -399,9 +469,7 @@ async def get_thread_history(
         thread_state = await checkpointer.aget(config)
 
         if thread_state is None:
-            raise HTTPException(
-                status_code=404, detail=f"Thread {thread_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Thread {thread_id} not found")
 
         # Extract messages from state
         messages = thread_state.get("channel_values", {}).get("messages", [])

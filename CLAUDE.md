@@ -54,6 +54,7 @@ docker run --env-file .env -p 8000:8000 megamind
 This is a FastAPI microservice that uses **LangGraph** to build stateful, multi-agent workflows. Each workflow is an independent state machine handling specific business functions. The key insight is that workflows are **compiled at startup** in `main.py:lifespan()` and stored in `app.state`.
 
 **Critical files:**
+
 - `src/megamind/main.py`: Application entry point, graph initialization, main API endpoints
 - `src/megamind/api/v1/minion.py`: Separate router for wiki/document search endpoints
 - `src/megamind/base_prompt.py`: Base prompt with tool usage instructions
@@ -69,15 +70,18 @@ This is a FastAPI microservice that uses **LangGraph** to build stateful, multi-
 ### API Endpoints and Graph Mapping
 
 **Endpoints in `main.py`:**
+
 - `/api/v1/stream/{thread}` → megamind_graph (uses RAG-augmented prompts from Titan)
 - `/api/v1/role-generation` → role_generation_graph (non-streaming, uses `ainvoke()`)
 - `/api/v1/reconciliation/merge` → Utility endpoint (no graph, direct Pandas processing)
 
 **Endpoints in `api/v1/minion.py` (included via router):**
+
 - `/api/v1/wiki/stream/{thread_id}` → wiki_graph (uses static prompts from prompts.py)
 - `/api/v1/document/stream/{thread_id}` → document_search_graph (uses static prompts from prompts.py)
 
 **Key differences:**
+
 - Main chat endpoint (`/api/v1/stream/{thread}`) uses RAG to retrieve relevant ERPNext knowledge from Titan
 - Minion endpoints use `MinionRequest` (only `question` field) instead of `ChatRequest`
 - Minion endpoints use a shared `_handle_minion_stream()` handler function
@@ -88,11 +92,13 @@ This is a FastAPI microservice that uses **LangGraph** to build stateful, multi-
 The main chat endpoint uses **Tool-Based RAG** where the LLM decides when and how to search the ERPNext knowledge base using tools, rather than pre-loading context.
 
 **Architecture:**
+
 - `src/megamind/graph/tools/titan_knowledge_tools.py`: LangChain tools for knowledge search
 - `src/megamind/base_prompt.py`: Base prompt with instructions on when/how to use knowledge tools
 - `src/megamind/clients/titan_client.py`: Client for Titan API (embeddings + knowledge search)
 
 **How it works:**
+
 1. System prompt instructs LLM to use `search_erpnext_knowledge` tool for ERPNext-specific questions
 2. LLM receives user query and decides whether knowledge search is needed
 3. If needed, LLM calls tool with appropriate parameters (query, content_types, doctype, etc.)
@@ -101,10 +107,12 @@ The main chat endpoint uses **Tool-Based RAG** where the LLM decides when and ho
 6. LLM can call tool multiple times in same conversation with different queries
 
 **Available Knowledge Tools:**
+
 - `search_erpnext_knowledge`: Semantic search with filtering by content type, DocType, operation
 - `get_erpnext_knowledge_by_id`: Retrieve specific knowledge entry by ID
 
 **Tool Parameters:**
+
 - `query` (required): Natural language search query
 - `content_types` (optional): Filter by workflow, best_practice, schema, example, error_pattern, relationship, process
 - `doctype` (optional): Filter by DocType name (e.g., "Sales Order")
@@ -140,6 +148,7 @@ User Request → Search Knowledge → Review Information → Execute Operation �
 **User**: "Create a Sales Order for customer ABC Corp with item ITEM-001, quantity 10"
 
 **LLM Workflow**:
+
 ```
 1. Search: search_erpnext_knowledge("Sales Order required fields create workflow",
                                      content_types="schema,workflow",
@@ -163,6 +172,7 @@ User Request → Search Knowledge → Review Information → Execute Operation �
 - ✅ **With knowledge search**: LLM knows exact requirements → provides complete data → operation succeeds immediately
 
 **Prevented Issues:**
+
 - Missing required fields causing validation errors
 - Incorrect field names or data types
 - Wrong workflow sequences
@@ -172,12 +182,14 @@ User Request → Search Knowledge → Review Information → Execute Operation �
 **When Tools Are Called:**
 
 **MANDATORY (Knowledge search BEFORE operations):**
+
 - Before calling ANY MCP tool for ERPNext operations
 - Before creating or updating DocTypes
 - Before workflow operations (submit, cancel, amend)
 - Before complex multi-step operations
 
 **Also called for (User questions):**
+
 - User asks about ERPNext workflows ("How do I create X?")
 - User needs schema information ("What fields does X have?")
 - User requests best practices
@@ -185,6 +197,7 @@ User Request → Search Knowledge → Review Information → Execute Operation �
 - Troubleshooting errors
 
 **Benefits Over Pre-Retrieval:**
+
 - ✅ **Knowledge-first pattern**: LLM searches BEFORE operations, preventing errors
 - ✅ **Higher accuracy**: Schema-informed operations with all required fields
 - ✅ **First-time success**: Operations succeed immediately without retries
@@ -196,6 +209,7 @@ User Request → Search Knowledge → Review Information → Execute Operation �
 - ✅ Lower latency for simple questions that don't need knowledge base
 
 **Technical Details:**
+
 - Uses vector embeddings (1536-dimensional for Gemini) for semantic search
 - Similarity threshold: 0.7 (70% relevance minimum)
 - Tools registered with megamind_graph workflow
@@ -207,11 +221,13 @@ User Request → Search Knowledge → Review Information → Execute Operation �
 The system implements **CRAG (Corrective Retrieval-Augmented Generation)** to automatically detect and recover from operation failures by analyzing errors, retrieving corrective knowledge, and retrying with improved information.
 
 **Architecture:**
+
 - `src/megamind/graph/nodes/corrective_rag_node.py`: CRAG implementation with error detection and query rewriting
 - Integrated into megamind_graph workflow between tool execution and agent
 - Automatic retry loop with knowledge enhancement
 
 **How it works:**
+
 1. Tool execution completes (may fail with error)
 2. CRAG node analyzes the result for error patterns
 3. If error detected:
@@ -223,6 +239,7 @@ The system implements **CRAG (Corrective Retrieval-Augmented Generation)** to au
 5. Success on retry (or exits after 2 attempts to prevent infinite loops)
 
 **Error Detection Patterns:**
+
 - Validation errors ("validation failed", "required field")
 - Missing fields ("missing", "not provided")
 - Invalid data ("invalid", "cannot")
@@ -248,6 +265,7 @@ Tool: ✅ Success! SO-00123 created
 ```
 
 **Key Features:**
+
 - **Intelligent error detection**: Pattern matching for common failure types
 - **Smart query rewriting**: LLM generates targeted knowledge queries based on error context
 - **Enhanced retrieval**: Higher match count (7 vs 5), lower threshold (0.6 vs 0.7) for corrections
@@ -255,30 +273,34 @@ Tool: ✅ Success! SO-00123 created
 - **Transparent correction**: Agent sees clear guidance with error details and corrective knowledge
 
 **State Management:**
+
 - `correction_attempts`: Tracks retry count (prevents infinite loops)
 - `last_error_context`: Stores error details for debugging
 - `is_correction_mode`: Flags that agent is in retry mode
 
 **Benefits:**
+
 - ✅ **40-60% reduction in operation failures**: Automatic recovery from validation errors
 - ✅ **Improved user experience**: Seamless retries without user intervention
 - ✅ **First-time success rate**: Combined with knowledge-first pattern, operations succeed immediately
 - ✅ **Learning from errors**: System retrieves targeted knowledge based on actual failures
 
 **Performance:**
+
 - +2-3 seconds latency per correction (query generation + retrieval)
 - ~500 tokens per correction (LLM query generation)
 - Only triggers on detected errors (no overhead for successful operations)
 
 **Testing:**
+
 - Comprehensive test suite in `tests/test_crag_integration.py`
 - 14 unit and integration tests covering error detection, query generation, retry logic
 - Run tests: `uv run pytest tests/test_crag_integration.py -v`
 
-
 ### Static Prompts (prompts.py)
 
 For specialized graph workflows, static prompt templates are defined in `src/megamind/prompts.py`:
+
 - `wiki_agent_instructions` / `document_agent_instructions`: Used by minion endpoints
 - Role generation prompts: `role_generation_agent_instructions`, `permission_description_agent_instructions`
 
@@ -287,11 +309,13 @@ These are simpler string templates with `{company}` and other placeholders forma
 ### API Routing Structure
 
 **Main router** (`main.py`):
+
 - Defines most endpoints directly in the main FastAPI app
 - Uses `_handle_chat_stream()` helper for main chat endpoint with RAG integration
 - Single generic endpoint serves all use cases via dynamic knowledge retrieval
 
 **Minion router** (`api/v1/minion.py`):
+
 - Separate APIRouter for wiki/document search
 - Included in main app via `app.include_router(minion_router, prefix="/api/v1", tags=["Minion"])`
 - Uses `_handle_minion_stream()` helper to reduce duplication
@@ -299,23 +323,35 @@ These are simpler string templates with `{company}` and other placeholders forma
 
 ### State Management and Persistence
 
-Uses **AsyncPostgresSaver** for checkpoint persistence:
-- Checkpointer is initialized in `main.py:lifespan()` with connection pool
-- Thread state is retrieved with `checkpointer.aget(config)` where config contains `thread_id`
-- System prompts are only added when `thread_state is None` (new threads)
-- Cookie-based authentication is passed through graph state for ERPNext/Frappe client calls
+Uses **AsyncPostgresSaver** for LangGraph checkpoint persistence and **Zep Knowledge Graph** for enhanced memory:
+
+**Checkpointing (PostgresSaver):**
+
+- Checkpointer initialized in `main.py:lifespan()` with connection pool
+- Thread state retrieved with `checkpointer.aget(config)` where config contains `thread_id`
+- System prompts only added when `thread_state is None` (new threads)
+- Cookie-based authentication passed through graph state for ERPNext/Frappe client calls
+
+**Knowledge Graph (Zep Cloud):**
+
+- Optional integration for fact extraction and semantic memory
+- ZepClient provides: `add_episode()`, `search_graph()`, `get_user_facts()`
+- Per-user graph isolation for personalized memory
+- Syncs conversation data for automatic fact extraction
 
 ### Database Connection Pool
 
 The application uses **AsyncConnectionPool** from psycopg for robust database connection management:
 
 **Architecture:**
+
 - `src/megamind/utils/database.py`: Connection utilities (configure, check callbacks)
 - Pool initialized in `main.py:lifespan()` with comprehensive configuration
 - Automatic connection health checking and replacement
 - Graceful startup retry logic and shutdown handling
 
 **Pool Configuration** (configurable via environment variables):
+
 - `min_size=2`: Minimum connections maintained in pool
 - `max_size=100`: Maximum concurrent connections allowed
 - `max_waiting=50`: Maximum requests that can queue for a connection
@@ -326,6 +362,7 @@ The application uses **AsyncConnectionPool** from psycopg for robust database co
 - `num_workers=3`: Background workers for pool maintenance
 
 **Connection Health Features:**
+
 - **TCP Keepalives**: Detect and close broken connections automatically
   - `keepalives_idle=30s`: Start keepalive packets after 30s of inactivity
   - `keepalives_interval=10s`: Send keepalive every 10s after idle period
@@ -335,17 +372,20 @@ The application uses **AsyncConnectionPool** from psycopg for robust database co
 - **Automatic Configuration**: New connections configured with optimal settings
 
 **Startup Behavior:**
+
 - Retry logic: 3 attempts with 2-second delays between retries
 - Detailed logging of pool configuration and initialization status
 - Fallback from `SUPABASE_DB_URL` to `SUPABASE_CONNECTION_STRING`
 - Critical failure if pool cannot be opened after all retries
 
 **Shutdown Behavior:**
+
 - Explicit pool closure with proper error handling
 - Waits for active connections to complete before shutdown
 - Logs shutdown progress and any errors during closure
 
 **Benefits:**
+
 - ✅ **Concurrent request handling**: Multiple requests can execute simultaneously
 - ✅ **Automatic reconnection**: Recovers from transient connection failures
 - ✅ **Connection health**: Detects and replaces broken connections before use
@@ -354,6 +394,7 @@ The application uses **AsyncConnectionPool** from psycopg for robust database co
 
 **Configuration:**
 Set pool parameters in `.env` (all optional, defaults shown above):
+
 ```bash
 DB_POOL_MIN_SIZE=2
 DB_POOL_MAX_SIZE=100
@@ -368,6 +409,7 @@ DB_POOL_NUM_WORKERS=3
 ### External Service Integration
 
 **Titan (ERPNext Knowledge Base):**
+
 - `src/megamind/clients/titan_client.py`: HTTP client for Titan API
 - Provides ERPNext knowledge search and embedding generation
 - Configuration: `TITAN_API_URL` in `.env` (default: http://localhost:8001)
@@ -375,41 +417,49 @@ DB_POOL_NUM_WORKERS=3
 - Endpoints: `/api/v1/erpnext-knowledge/search`, `/api/v1/erpnext-knowledge/{id}`, etc.
 
 **Frappe/ERPNext:**
+
 - `src/megamind/clients/frappe_client.py`: HTTP client for ERPNext API
 - Uses cookie-based authentication passed from request headers
 - Called in graph nodes to fetch/create ERP data
 
 **MCP Servers:**
+
 - `src/megamind/clients/mcp_client_manager.py`: Manages MCP server connections
 - Frappe MCP server path configured in `.env` as `FRAPPE_MCP_SERVER_PATH`
 - Used by megamind_graph's `erpnext_mcp_tool_agent` ToolNode
 
 **Supabase:**
+
 - `src/megamind/clients/supabase_client.py`: Client for vector storage and data retrieval
 - Migrations in `supabase/migrations/`
 
 **Minion Service:**
+
 - `src/megamind/clients/minion_client.py`: Client for wiki/document search
 - Tools in `src/megamind/graph/tools/minion_tools.py`
 
 ### Graph Workflows
 
 **megamind_graph** (main.py:51, workflows/megamind_graph.py):
+
 - Entry: `megamind_agent_node` → calls tools (knowledge + MCP) → `corrective_rag_node` → back to agent
 - CRAG layer between tool execution and agent provides automatic error recovery
 - Exit: `knowledge_capture_node` refines final response
 - Used for general queries, RAG, tool-based actions, and ERPNext operations
 
 **stock_movement_graph** (workflows/stock_movement_graph.py):
+
 - Single node: `smart_stock_movement_node` (nodes/stock_movement/smart_stock_movement_node.py)
 - Extracts item code/quantity, auto-selects warehouse, creates stock entry
 - Mongolian language support
 
 **wiki_graph & document_search_graph** (workflows/wiki_graph.py, workflows/document_search_graph.py):
+
 - Single-node solutions: `wiki_agent_node` and `document_agent_node` (nodes/minion_agent.py)
 - Use search_wiki/search_document tools via minion_tools.py
 
 **role_generation_graph** (workflows/role_generation_graph.py):
+
 - Generates ERPNext role permissions based on user description
 - Multi-node workflow: finds similar role → generates permissions → describes in human-readable format
 - Non-streaming: uses `ainvoke()` instead of streaming, returns complete JSON response
@@ -417,6 +467,7 @@ DB_POOL_NUM_WORKERS=3
 ### Configuration
 
 Environment variables (see `.env.example`):
+
 - `GOOGLE_API_KEY`: For Google Gemini LLM
 - `FRAPPE_URL`, `FRAPPE_API_KEY`, `FRAPPE_API_SECRET`: ERPNext connection
 - `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_CONNECTION_STRING`: Database and vector store
@@ -439,6 +490,7 @@ Settings loaded via `src/megamind/utils/config.py` using pydantic-settings.
 ### Modifying Prompts
 
 **For tool-based knowledge retrieval** (used by main chat endpoint):
+
 1. **Base prompt**: Edit `src/megamind/base_prompt.py` to:
    - Modify core agent behavior and identity
    - Adjust instructions on when to use knowledge search tools
@@ -452,6 +504,7 @@ Settings loaded via `src/megamind/utils/config.py` using pydantic-settings.
 4. Test by sending queries to `/api/v1/stream/{thread}` and observing when LLM calls knowledge tools
 
 **For static prompts** (used by specialized graphs):
+
 1. Edit the prompt string in `src/megamind/prompts.py`
 2. Use `.format()` placeholders like `{company}` for runtime values
 3. Reference the prompt in the graph's node or endpoint handler
@@ -465,6 +518,7 @@ Settings loaded via `src/megamind/utils/config.py` using pydantic-settings.
 5. Update routing logic if tool requires user consent (see `route_tools_from_rag`)
 
 **Example** (Titan knowledge tools):
+
 - Defined in `src/megamind/graph/tools/titan_knowledge_tools.py`
 - Registered in megamind_agent_node (combined with MCP tools)
 - Added to ToolNode in megamind_graph workflow
@@ -473,18 +527,21 @@ Settings loaded via `src/megamind/utils/config.py` using pydantic-settings.
 ### Adding New API Endpoints
 
 **When to use which approach:**
+
 - **Main.py endpoints**: Simple endpoints that can reuse existing graph workflows
 - **Separate router**: Feature with multiple related endpoints, or endpoints with significant business logic (recommended for maintainability)
 
 #### Option A: Add Endpoint in main.py
 
 **For streaming LangGraph endpoints:**
+
 1. Define endpoint with `@app.post("/api/v1/your-endpoint/stream/{thread}")`
 2. Use `_handle_chat_stream()` if using megamind_graph with RAG (already handles knowledge retrieval)
 3. Create corresponding request model in `src/megamind/models/requests.py` if needed
 4. Return responses via `stream_response_with_ping()`
 
 **For non-streaming endpoints:**
+
 1. Define endpoint with `@app.post("/api/v1/your-endpoint")`
 2. Create custom handler function
 3. Use `MainResponse` for consistent response format
@@ -495,6 +552,7 @@ Settings loaded via `src/megamind/utils/config.py` using pydantic-settings.
 **Step-by-step guide with example:**
 
 **1. Define Request/Response Models** (`src/megamind/models/requests.py` and `responses.py`)
+
 ```python
 # In requests.py
 class YourFeatureRequest(BaseModel):
@@ -505,6 +563,7 @@ class YourFeatureRequest(BaseModel):
 ```
 
 **2. Create Prompt** (`src/megamind/prompts.py`)
+
 ```python
 your_feature_agent_instructions = """Your prompt here with {placeholder} support.
 
@@ -519,6 +578,7 @@ Step-by-step instructions...
 ```
 
 **3. Create Business Logic** (e.g., `src/megamind/graph/nodes/your_feature_agent.py`)
+
 ```python
 from langchain_google_genai import ChatGoogleGenerativeAI
 from loguru import logger
@@ -554,6 +614,7 @@ async def your_processing_function(data: list[str]) -> YourSchema:
 ```
 
 **4. Create Schema** (`src/megamind/graph/schemas.py`)
+
 ```python
 class YourSchema(BaseModel):
     """
@@ -564,6 +625,7 @@ class YourSchema(BaseModel):
 ```
 
 **5. Create External Client** (if needed, e.g., `src/megamind/clients/your_service_client.py`)
+
 ```python
 import httpx
 from loguru import logger
@@ -598,6 +660,7 @@ class YourServiceClient:
 ```
 
 **6. Create Router** (`src/megamind/api/v1/your_feature.py`)
+
 ```python
 from fastapi import APIRouter, Request, HTTPException
 from loguru import logger
@@ -680,6 +743,7 @@ async def callback_handler(
 ```
 
 **7. Update Configuration** (`src/megamind/utils/config.py`)
+
 ```python
 class Settings(BaseSettings):
     # ... existing settings ...
@@ -689,11 +753,13 @@ class Settings(BaseSettings):
 ```
 
 **8. Update Environment Variables** (`.env.example`)
+
 ```bash
 YOUR_SERVICE_API_URL="http://localhost:8001"
 ```
 
 **9. Register Router** (`src/megamind/main.py`)
+
 ```python
 # Import at top
 from megamind.api.v1.your_feature import router as your_feature_router
@@ -705,6 +771,7 @@ app.include_router(
 ```
 
 **Key Conventions:**
+
 - Always use `MainResponse` for consistent response format
 - Wrap all responses in `MainResponse(message="...", response={...}).model_dump()`
 - Wrap errors in `MainResponse(message="Error", error="...").model_dump()`
@@ -714,6 +781,7 @@ app.include_router(
 - Document endpoints with clear docstrings
 
 **Real Examples in Codebase:**
+
 - **Simple router**: `src/megamind/api/v1/minion.py` (streaming endpoints with shared handler)
 - **Complex router**: `src/megamind/api/v1/document_extraction.py` (submit + callback pattern)
 - **Main.py endpoint**: `/api/v1/role-generation` (non-streaming with direct LLM call)

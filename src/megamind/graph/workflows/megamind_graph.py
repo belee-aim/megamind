@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END
 from langgraph.types import Send
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from typing import List
+from typing import List, Optional
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
@@ -97,7 +97,7 @@ def route_after_synthesizer(state: AgentState) -> str | List[Send]:
         return END
 
 
-async def build_megamind_graph(checkpointer: AsyncPostgresSaver = None):
+async def build_megamind_graph(checkpointer: Optional[AsyncPostgresSaver] = None):
     """
     Builds the LangGraph for the Multi-Agent system.
 

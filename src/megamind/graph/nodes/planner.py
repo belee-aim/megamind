@@ -1,7 +1,7 @@
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import AIMessage, SystemMessage
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 from typing import List
 
 from megamind.configuration import Configuration
@@ -31,15 +31,22 @@ Create a plan for the user's request."""
 class PlanStep(BaseModel):
     """A single step in the execution plan."""
 
-    step_number: int = Field(description="Step number (1-based)")
+    step_number: int = Field(
+        description="Step number (1-based)",
+        validation_alias=AliasChoices("step_number", "id", "sequence"),
+    )
     specialist: str = Field(description="Target specialist for this step")
-    task: str = Field(description="Specific task description for the specialist")
+    task: str = Field(
+        description="Specific task description for the specialist",
+        validation_alias=AliasChoices("task", "action", "description", "details"),
+    )
     depends_on: List[int] = Field(
         default=[], description="Step numbers this depends on"
     )
     can_parallel: bool = Field(
         default=False,
         description="True if this step can run in parallel with other steps at same level",
+        validation_alias=AliasChoices("can_parallel", "can_run_parallel", "parallel"),
     )
 
 

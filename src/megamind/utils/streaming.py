@@ -1,7 +1,6 @@
 import asyncio
 from fastapi.responses import StreamingResponse
 from loguru import logger
-from langchain_core.messages import AIMessage, ToolMessage
 import json
 
 
@@ -48,15 +47,18 @@ AGENT_DISPLAY_NAMES = {
 }
 
 
-async def stream_response_with_ping(graph, inputs, config, provider=None):
+async def stream_response_with_ping(
+    graph, inputs, config, provider=None, zep_client=None, zep_thread_id=None
+):
     """
     Streams responses from the graph with agent status visibility.
 
     Events:
     - agent_start: When an agent begins processing
-    - agent_thinking: Agent's reasoning/decision (from structured output)
+    - agent_reasoning: Agent's internal reasoning/planning (from structured output agents)
+    - agent_thinking: Agent's final decision summary (from structured output)
     - agent_tool_call: When agent calls a tool
-    - stream_event: Text content being streamed
+    - stream_event: Actual user-facing response content
     - done: Stream complete
 
     All newline characters are replaced with |new_line| token for consistent formatting.
@@ -66,8 +68,20 @@ async def stream_response_with_ping(graph, inputs, config, provider=None):
         inputs: Input data for the graph
         config: Configuration for the graph
         provider: Optional provider name (reserved for future provider-specific processing)
+        zep_client: Optional ZepClient for syncing AI response to Zep thread
+        zep_thread_id: Thread ID for Zep message sync
     """
     queue = asyncio.Queue()
+
+    # Collect AI response content for Zep sync
+    ai_response_content = []
+
+    # Agents that use structured output - their streaming is "reasoning"
+    # Synthesizer is NOT included because it produces actual user-facing responses
+    STRUCTURED_OUTPUT_AGENTS = {
+        "orchestrator_node",
+        "planner_node",
+    }
 
     async def stream_producer():
         try:
@@ -138,12 +152,25 @@ async def stream_response_with_ping(graph, inputs, config, provider=None):
                             # Replace newlines and spaces with tokens
                             text_content = text_content.replace("\n", "|new_line|")
                             text_content = text_content.replace(" ", "|space|")
-                            await queue.put(
-                                {
-                                    "type": "stream_event",
-                                    "content": text_content,
-                                }
-                            )
+
+                            # Determine event type based on current agent
+                            if current_agent in STRUCTURED_OUTPUT_AGENTS:
+                                # This is reasoning/planning content
+                                await queue.put(
+                                    {
+                                        "type": "agent_reasoning",
+                                        "agent": current_agent,
+                                        "content": text_content,
+                                    }
+                                )
+                            else:
+                                # This is actual user-facing response
+                                await queue.put(
+                                    {
+                                        "type": "stream_event",
+                                        "content": text_content,
+                                    }
+                                )
 
         except Exception as e:
             logger.error(f"Error in stream producer: {e}")
@@ -157,6 +184,24 @@ async def stream_response_with_ping(graph, inputs, config, provider=None):
             try:
                 item = await asyncio.wait_for(queue.get(), timeout=2.0)
                 if item is None:
+                    # Sync AI response to Zep before sending done event
+                    if zep_client and zep_thread_id and ai_response_content:
+                        full_response = "".join(ai_response_content)
+                        # Decode tokens back to readable text
+                        full_response = full_response.replace("|new_line|", "\n")
+                        full_response = full_response.replace("|space|", " ")
+                        try:
+                            await zep_client.add_message(
+                                thread_id=zep_thread_id,
+                                role="assistant",
+                                content=full_response,
+                            )
+                            logger.debug(
+                                f"Synced AI response to Zep thread: {zep_thread_id}"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to sync AI response to Zep: {e}")
+
                     yield "event: done\ndata: {}\n\n".encode("utf-8")
                     break
 
@@ -198,9 +243,23 @@ async def stream_response_with_ping(graph, inputs, config, provider=None):
                             "utf-8"
                         )
 
+                    elif event_type == "agent_reasoning":
+                        # Send reasoning stream (from orchestrator/planner)
+                        data = json.dumps(
+                            {
+                                "agent": item.get("agent"),
+                                "content": item.get("content", ""),
+                            }
+                        )
+                        yield f"event: agent_reasoning\ndata: {data}\n\n".encode(
+                            "utf-8"
+                        )
+
                     elif event_type == "stream_event":
-                        # Send content stream
+                        # Send actual response content stream
                         content = item.get("content", "")
+                        # Collect for Zep sync
+                        ai_response_content.append(content)
                         yield f"event: stream_event\ndata: {content}\n\n".encode(
                             "utf-8"
                         )
@@ -212,6 +271,7 @@ async def stream_response_with_ping(graph, inputs, config, provider=None):
                         yield f"event: error\ndata: {data}\n\n".encode("utf-8")
                 else:
                     # Legacy string content
+                    ai_response_content.append(str(item))
                     yield f"event: stream_event\ndata: {item}\n\n".encode("utf-8")
 
             except asyncio.TimeoutError:

@@ -4,7 +4,6 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-
 from megamind.models.requests import MinionRequest
 from megamind.utils.streaming import stream_response_with_ping
 from megamind.utils.config import settings
@@ -23,7 +22,10 @@ def get_token_from_header(request: Request):
         raise HTTPException(status_code=400, detail="Authorization header not found")
 
     if not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=400, detail="Invalid authorization header format. Expected 'Bearer {token}'")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid authorization header format. Expected 'Bearer {token}'",
+        )
 
     token = auth_header.replace("Bearer ", "", 1)
     return token
@@ -55,7 +57,7 @@ async def _handle_minion_stream(
         system_prompt = context_info + prompt.format(company=company)
         messages.append(SystemMessage(content=system_prompt))
 
-    messages.append(HumanMessage(content=chat_request.question))
+    messages.append(HumanMessage(content=chat_request.query))
 
     inputs = {"messages": messages}
 
