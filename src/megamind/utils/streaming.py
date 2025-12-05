@@ -36,14 +36,23 @@ def extract_text_content(content):
 
 # Agent display names for user-friendly output
 AGENT_DISPLAY_NAMES = {
+    # Deep Agent orchestrator
+    "deep_agent": "Orchestrator",
+    # Legacy node names (kept for backwards compatibility during migration)
     "orchestrator_node": "Orchestrator",
     "planner_node": "Planner",
     "synthesizer_node": "Synthesizer",
-    "business_process_analyst": "Business Process Analyst",
-    "workflow_analyst": "Workflow Analyst",
+    # Subagent names (Deep Agents format)
+    "knowledge-analyst": "Knowledge Analyst",
+    "knowledge_analyst": "Knowledge Analyst",
+    "report-analyst": "Report Analyst",
     "report_analyst": "Report Analyst",
+    "system-specialist": "System Specialist",
     "system_specialist": "System Specialist",
+    "transaction-specialist": "Transaction Specialist",
     "transaction_specialist": "Transaction Specialist",
+    "document-specialist": "Document Specialist",
+    "document_specialist": "Document Specialist",
 }
 
 
@@ -78,6 +87,8 @@ async def stream_response_with_ping(
 
     # Agents that use structured output - their streaming is "reasoning"
     # Synthesizer is NOT included because it produces actual user-facing responses
+    # Note: Deep Agent does planning but also produces user-facing responses,
+    # so we DON'T include it here to ensure responses stream to user
     STRUCTURED_OUTPUT_AGENTS = {
         "orchestrator_node",
         "planner_node",
@@ -92,16 +103,22 @@ async def stream_response_with_ping(
                 event_type = event.get("event")
                 event_name = event.get("name", "")
                 event_data = event.get("data", {})
+                metadata = event.get("metadata", {})
+
+                # Try to get langgraph_node from metadata for more accurate agent tracking
+                langgraph_node = metadata.get("langgraph_node", "")
 
                 # Detect node/agent starts
                 if event_type == "on_chain_start":
-                    if event_name in AGENT_DISPLAY_NAMES:
-                        current_agent = event_name
-                        display_name = AGENT_DISPLAY_NAMES.get(event_name, event_name)
+                    # Check if this is a known agent node
+                    check_name = langgraph_node or event_name
+                    if check_name in AGENT_DISPLAY_NAMES:
+                        current_agent = check_name
+                        display_name = AGENT_DISPLAY_NAMES.get(check_name, check_name)
                         await queue.put(
                             {
                                 "type": "agent_start",
-                                "agent": event_name,
+                                "agent": check_name,
                                 "display_name": display_name,
                             }
                         )
@@ -128,10 +145,26 @@ async def stream_response_with_ping(
                                     }
                                 )
 
-                # Detect tool calls
+                # Detect tool calls - especially 'task' for subagent delegation
                 if event_type == "on_tool_start":
                     tool_name = event_name
                     tool_input = event_data.get("input", {})
+
+                    # If this is a 'task' tool, it's a subagent delegation
+                    # Extract the subagent name from subagent_type field
+                    if tool_name == "task" and isinstance(tool_input, dict):
+                        subagent = tool_input.get("subagent_type", "")
+                        if subagent and subagent in AGENT_DISPLAY_NAMES:
+                            current_agent = subagent
+                            display_name = AGENT_DISPLAY_NAMES.get(subagent, subagent)
+                            await queue.put(
+                                {
+                                    "type": "agent_start",
+                                    "agent": subagent,
+                                    "display_name": display_name,
+                                }
+                            )
+
                     await queue.put(
                         {
                             "type": "agent_tool_call",
@@ -165,9 +198,11 @@ async def stream_response_with_ping(
                                 )
                             else:
                                 # This is actual user-facing response
+                                # Include agent info so clients know which agent is responding
                                 await queue.put(
                                     {
                                         "type": "stream_event",
+                                        "agent": current_agent,
                                         "content": text_content,
                                     }
                                 )
@@ -256,13 +291,13 @@ async def stream_response_with_ping(
                         )
 
                     elif event_type == "stream_event":
-                        # Send actual response content stream
+                        # Send actual response content stream with agent info
                         content = item.get("content", "")
+                        agent = item.get("agent")
                         # Collect for Zep sync
                         ai_response_content.append(content)
-                        yield f"event: stream_event\ndata: {content}\n\n".encode(
-                            "utf-8"
-                        )
+                        data = json.dumps({"agent": agent, "content": content})
+                        yield f"event: stream_event\ndata: {data}\n\n".encode("utf-8")
 
                     elif event_type == "error":
                         data = json.dumps(

@@ -16,7 +16,6 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
-from megamind.prompts import build_system_prompt
 from megamind.clients.frappe_client import FrappeClient
 from megamind.clients.zep_client import get_zep_client
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
@@ -259,33 +258,33 @@ async def _handle_chat_stream(
                 logger.warning(f"Failed to setup Zep user/thread: {e}")
                 user_id = None
 
-        # Initialize system prompt if it's a new thread
+        # Get user context for Deep Agent orchestrator prompt
+        frappe_client = FrappeClient(access_token=access_token)
+        company = frappe_client.get_default_company()
+        user_info = frappe_client.get_current_user_info()
+        current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+
+        logger.debug(f"Using company: {company}")
+        logger.info(
+            f"User context loaded: {user_info.get('full_name', 'Unknown')} ({user_info.get('email', 'Unknown')})"
+        )
+
+        # Build config with user context for Deep Agent
+        # Deep Agent's orchestrator prompt is built dynamically with this context
+        config = RunnableConfig(
+            configurable={
+                "thread_id": thread,
+                "company": company,
+                "current_datetime": current_datetime,
+                "user_name": user_info.get("full_name", ""),
+                "user_email": user_info.get("email", ""),
+                "user_roles": user_info.get("roles", []),
+                "user_department": user_info.get("department", ""),
+            }
+        )
+
         if thread_state is None:
             logger.debug(f"Initializing new thread: {thread}")
-
-            # Get runtime values
-            frappe_client = FrappeClient(access_token=access_token)
-            company = frappe_client.get_default_company()
-            user_info = frappe_client.get_current_user_info()
-            current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-
-            logger.debug(f"Using company: {company}")
-            logger.info(
-                f"User context loaded: {user_info.get('full_name', 'Unknown')} ({user_info.get('email', 'Unknown')})"
-            )
-            logger.debug(f"Current datetime: {current_datetime}")
-
-            # Build system prompt with user information (knowledge will be retrieved by LLM via tools)
-            system_prompt = build_system_prompt(
-                company=company,
-                current_datetime=current_datetime,
-                user_name=user_info.get("full_name", ""),
-                user_email=user_info.get("email", ""),
-                user_roles=user_info.get("roles", []),
-                user_department=user_info.get("department", ""),
-            )
-            messages.append(SystemMessage(content=system_prompt))
-            logger.debug(f"System prompt built for thread: {thread}")
         else:
             logger.debug(f"Continuing existing thread: {thread}")
 
@@ -331,7 +330,6 @@ async def _handle_chat_stream(
         inputs = {
             "messages": messages,
             "access_token": access_token,
-            "company": request_data.company,
         }
 
         logger.debug(f"Starting stream for thread: {thread}")
