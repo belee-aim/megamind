@@ -16,48 +16,6 @@ class InterruptResponse(BaseModel):
     )
 
 
-class Permission(BaseModel):
-    if_owner: str | None
-    has_if_owner_enabled: bool
-    select: int
-    read: int
-    write: int
-    create: int
-    delete: int
-    submit: int
-    cancel: int
-    amend: int
-    print: int
-    email: int
-    report: int
-    import_perm: int = Field(alias="import")
-    export: int
-    share: int
-
-
-class DoctypePermission(BaseModel):
-    doctype: str
-    permissions: Permission
-
-
-class RoleGenerationResponse(BaseModel):
-    """
-    Response model for role generation requests.
-    """
-
-    roles: list[DoctypePermission] = Field(
-        description="The generated roles based on the user's description."
-    )
-
-
-class RelatedRoleResponse(BaseModel):
-    """
-    Response model for finding a related role.
-    """
-
-    role_name: str = Field(description="The name of the related role.")
-
-
 class Policy(BaseModel):
     """Company policy information"""
 
@@ -73,7 +31,8 @@ class OfficeLocation(BaseModel):
     """Office location information"""
 
     location_type: Literal["office"] = Field(
-        default="office", description="Type of location (always 'office' for office locations)"
+        default="office",
+        description="Type of location (always 'office' for office locations)",
     )
     name: str = Field(description="Location name")
     address_title: str = Field(description="Address title")
@@ -90,7 +49,8 @@ class RetailStore(BaseModel):
     """Retail store information"""
 
     location_type: Literal["retail"] = Field(
-        default="retail", description="Type of location (always 'retail' for retail stores)"
+        default="retail",
+        description="Type of location (always 'retail' for retail stores)",
     )
     name: str = Field(description="Store name")
     store_name: str = Field(description="Store name")
@@ -195,7 +155,11 @@ class RawCompanyInformation(BaseModel):
         description="List of company policies. Only extract if explicitly stated.",
     )
     office_retail_locations: Optional[
-        List[Annotated[Union[OfficeLocation, RetailStore], Field(discriminator="location_type")]]
+        List[
+            Annotated[
+                Union[OfficeLocation, RetailStore], Field(discriminator="location_type")
+            ]
+        ]
     ] = Field(
         default=[],
         description="List of office and retail locations. Only extract if explicitly stated with location_type.",
@@ -248,7 +212,11 @@ class CompanyInformation(BaseModel):
         description="List of company policies including HR policies, code of conduct, compliance policies, etc. Return empty list if not found.",
     )
     office_retail_locations: Optional[
-        List[Annotated[Union[OfficeLocation, RetailStore], Field(discriminator="location_type")]]
+        List[
+            Annotated[
+                Union[OfficeLocation, RetailStore], Field(discriminator="location_type")
+            ]
+        ]
     ] = Field(
         default=[],
         description="List of office and retail locations with addresses, types, and operational details. Each location must have a 'location_type' field set to either 'office' or 'retail'. Return empty list if not found.",
@@ -273,7 +241,8 @@ class CompanyInformation(BaseModel):
         if isinstance(v, list):
             # Filter out empty dicts and dicts without required fields
             return [
-                loc for loc in v
+                loc
+                for loc in v
                 if isinstance(loc, dict) and loc and "location_type" in loc
             ]
         return v
@@ -362,7 +331,7 @@ class KnowledgeEntrySchema(BaseModel):
     )
     better_search_query: Optional[str] = Field(
         default=None,
-        description="Improved search query with specific keywords and filters (e.g., 'search_erpnext_knowledge(\"Payment Entry required fields\", doctype=\"Payment Entry\")')",
+        description='Improved search query with specific keywords and filters (e.g., \'search_erpnext_knowledge("Payment Entry required fields", doctype="Payment Entry")\')',
     )
     search_query_improvements: Optional[str] = Field(
         default=None,

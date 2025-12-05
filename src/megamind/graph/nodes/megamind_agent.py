@@ -9,14 +9,6 @@ from megamind.graph.tools.titan_knowledge_tools import (
     search_erpnext_knowledge,
     get_erpnext_knowledge_by_id,
 )
-from megamind.graph.tools.minion_tools import (
-    search_processes,
-    search_workflows,
-    get_process_definition,
-    get_workflow_definition,
-    query_workflow_next_steps,
-    query_workflow_available_actions,
-)
 
 from ..states import AgentState
 
@@ -98,17 +90,7 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
     # Add Titan knowledge search tools
     titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
 
-    # Add Minion process/workflow tools
-    minion_tools = [
-        search_processes,
-        search_workflows,
-        get_process_definition,
-        get_workflow_definition,
-        query_workflow_next_steps,
-        query_workflow_available_actions,
-    ]
-
-    all_tools = mcp_tools + titan_tools + minion_tools
+    all_tools = mcp_tools + titan_tools
 
     # Track LLM invocation time
     llm_start = time.time()

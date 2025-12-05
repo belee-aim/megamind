@@ -66,20 +66,6 @@ async def _handle_minion_stream(
     )
 
 
-@router.post("/wiki/stream/{thread_id}")
-async def wiki_stream(request: Request, chat_request: MinionRequest, thread_id: str):
-    """
-    Handles streaming chat requests for the wiki graph.
-    """
-    return await _handle_minion_stream(
-        request,
-        chat_request,
-        "wiki_graph",
-        prompts.wiki_agent_instructions,
-        thread_id,
-    )
-
-
 @router.post("/document/stream/{thread_id}")
 async def document_stream(
     request: Request, chat_request: MinionRequest, thread_id: str

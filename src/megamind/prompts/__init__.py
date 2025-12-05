@@ -6,7 +6,7 @@ All prompts are re-exported here for backward compatibility with existing import
 
 Usage:
     from megamind import prompts
-    prompts.wiki_agent_instructions
+    prompts.document_agent_instructions
     prompts.build_system_prompt(company="Example", current_datetime="2025-01-01")
 """
 
@@ -16,16 +16,9 @@ from megamind.prompts.megamind import (
     build_system_prompt,
 )
 
-# Import from minion module (wiki and document agents)
+# Import from minion module (document agents)
 from megamind.prompts.minion import (
-    wiki_agent_instructions,
     document_agent_instructions,
-)
-
-# Import from role_generation module
-from megamind.prompts.role_generation import (
-    role_generation_agent_instructions,
-    permission_description_agent_instructions,
 )
 
 # Import from document_extraction module
@@ -50,11 +43,7 @@ __all__ = [
     "BASE_SYSTEM_PROMPT",
     "build_system_prompt",
     # Minion agents
-    "wiki_agent_instructions",
     "document_agent_instructions",
-    # Role generation
-    "role_generation_agent_instructions",
-    "permission_description_agent_instructions",
     # Document extraction
     "fact_extraction_agent_instructions",
     "value_inference_agent_instructions",

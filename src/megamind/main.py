@@ -20,10 +20,6 @@ from megamind.clients.frappe_client import FrappeClient
 from megamind.clients.zep_client import get_zep_client
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.megamind_graph import build_megamind_graph
-from megamind.graph.workflows.role_generation_graph import (
-    build_role_generation_graph,
-)
-from megamind.graph.workflows.wiki_graph import build_wiki_graph
 from megamind.graph.workflows.document_search_graph import build_document_search_graph
 from megamind.graph.workflows.document_extraction_graph import (
     build_document_extraction_graph,
@@ -88,14 +84,6 @@ async def lifespan(app: FastAPI):
         document_graph = await build_megamind_graph(checkpointer=checkpointer)
         logger.info("Megamind graph built successfully")
 
-        logger.info("Building role generation graph")
-        role_generation_graph = await build_role_generation_graph()
-        logger.info("Role generation graph built successfully")
-
-        logger.info("Building wiki graph")
-        wiki_graph = await build_wiki_graph(checkpointer=checkpointer)
-        logger.info("Wiki graph built successfully")
-
         logger.info("Building document search graph")
         document_search_graph = await build_document_search_graph(
             checkpointer=checkpointer
@@ -112,8 +100,6 @@ async def lifespan(app: FastAPI):
         app.state.zep_client = zep_client
         app.state.stock_movement_graph = document_graph
         app.state.document_graph = document_graph
-        app.state.role_generation_graph = role_generation_graph
-        app.state.wiki_graph = wiki_graph
         app.state.document_search_graph = document_search_graph
         app.state.document_extraction_graph = document_extraction_graph
         app.state.startup_success = True

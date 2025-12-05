@@ -106,10 +106,6 @@ async def call_business_process_analyst(query: str) -> str:
         search_erpnext_knowledge,
         get_erpnext_knowledge_by_id,
     )
-    from megamind.graph.tools.minion_tools import (
-        search_processes,
-        get_process_definition,
-    )
     from megamind.prompts.subagent_prompts import BUSINESS_PROCESS_ANALYST_PROMPT
 
     logger.debug("---BUSINESS PROCESS ANALYST TOOL---")
@@ -136,8 +132,6 @@ async def call_business_process_analyst(query: str) -> str:
     local_tools = [
         search_erpnext_knowledge,
         get_erpnext_knowledge_by_id,
-        search_processes,
-        get_process_definition,
     ]
     tools = filtered_mcp_tools + local_tools
 
@@ -166,12 +160,6 @@ async def call_workflow_analyst(query: str) -> str:
         The specialist's response.
     """
     from langchain.agents import create_agent
-    from megamind.graph.tools.minion_tools import (
-        search_workflows,
-        get_workflow_definition,
-        query_workflow_next_steps,
-        query_workflow_available_actions,
-    )
     from megamind.prompts.subagent_prompts import WORKFLOW_ANALYST_PROMPT
 
     logger.debug("---WORKFLOW ANALYST TOOL---")
@@ -184,13 +172,7 @@ async def call_workflow_analyst(query: str) -> str:
     target_tool_names = ["get_workflow_state", "apply_workflow"]
     filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
 
-    local_tools = [
-        search_workflows,
-        get_workflow_definition,
-        query_workflow_next_steps,
-        query_workflow_available_actions,
-    ]
-    tools = filtered_mcp_tools + local_tools
+    tools = filtered_mcp_tools
 
     agent = create_agent(llm, tools=tools, system_prompt=WORKFLOW_ANALYST_PROMPT)
     response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
