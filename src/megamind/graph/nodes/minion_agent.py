@@ -63,6 +63,6 @@ async def document_agent_node(state: AgentState, config: RunnableConfig):
         google_api_key=settings.google_api_key,
     )
     tools = [search_document]
-    response = await llm.bind_tools(tools).ainvoke(messages)
+    response = await llm.bind_tools(tools, parallel_tool_calls=True).ainvoke(messages)
 
     return {"messages": [response]}

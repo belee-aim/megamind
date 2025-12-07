@@ -94,7 +94,7 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
 
     # Track LLM invocation time
     llm_start = time.time()
-    response = await llm.bind_tools(all_tools).ainvoke(messages)
+    response = await llm.bind_tools(all_tools, parallel_tool_calls=True).ainvoke(messages)
     llm_end = time.time()
 
     # Calculate LLM latency
