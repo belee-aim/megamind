@@ -1,59 +1,125 @@
-"""
-Megamind Graph Builder.
-
-This module builds the main LangGraph for the Megamind Multi-Agent system.
-Now uses Deep Agents for orchestration, replacing the custom orchestrator/planner/synthesizer pattern.
-"""
-
 from langgraph.graph import StateGraph, END
+from langgraph.types import Send
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from typing import Optional
+from typing import List, Optional
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.states import AgentState
-from megamind.graph.workflows.deep_agent_graph import deep_agent_node
+
+# Import nodes
+from megamind.graph.nodes.orchestrator import orchestrator_node
+from megamind.graph.nodes.planner import planner_node
 from megamind.graph.nodes.knowledge_capture_node import knowledge_capture_node
+
+# Import subagents
+from megamind.graph.agents.semantic_analyst import semantic_analyst
+from megamind.graph.agents.report_analyst import report_analyst
+from megamind.graph.agents.system_specialist import system_specialist
+
+
+SPECIALIST_MAP = {
+    # New names (knowledge, report, operations)
+    "knowledge": "semantic_analyst",
+    "report": "report_analyst",
+    "operations": "system_specialist",
+    # Legacy names for backward compatibility
+    "business_process": "semantic_analyst",
+    "workflow": "semantic_analyst",
+    "semantic": "semantic_analyst",
+    "system": "system_specialist",
+}
+
+
+def route_after_orchestrator(state: AgentState) -> str | List[Send]:
+    """
+    Routes from Orchestrator based on its decision.
+    Supports parallel execution via Send().
+    """
+    next_action = state.get("next_action")
+
+    if next_action == "plan":
+        return "planner_node"
+    elif next_action == "parallel":
+        # Send to multiple specialists in parallel
+        pending = state.get("pending_specialists", [])
+        if pending:
+            return [
+                Send(SPECIALIST_MAP[s], state) for s in pending if s in SPECIALIST_MAP
+            ]
+        return END
+    elif next_action == "route":
+        target = state.get("target_specialist")
+        return SPECIALIST_MAP.get(target, END)
+    else:  # "respond" or unknown
+        return END
+
+
+def route_after_planner(state: AgentState) -> str | List[Send]:
+    """
+    Routes from Planner to specialists.
+    Supports parallel execution for first group.
+    """
+    next_action = state.get("next_action")
+
+    if next_action == "parallel":
+        pending = state.get("pending_specialists", [])
+        if pending:
+            return [
+                Send(SPECIALIST_MAP[s], state) for s in pending if s in SPECIALIST_MAP
+            ]
+        return END
+    elif next_action == "route":
+        target = state.get("target_specialist")
+        return SPECIALIST_MAP.get(target, END)
+    else:
+        return END
 
 
 async def build_megamind_graph(checkpointer: Optional[AsyncPostgresSaver] = None):
     """
     Builds the LangGraph for the Multi-Agent system.
 
-    Architecture (Deep Agents):
-    - Entry: deep_agent_node handles all orchestration and delegation
-    - Deep Agents framework manages subagent coordination internally
-    - Optional: knowledge_capture_node for post-processing
-    - Exit: Graph ends after producing final response
-
-    This replaces the previous architecture with:
-    - orchestrator_node
-    - planner_node
-    - individual subagent nodes
-    - synthesizer_node
-    - complex conditional routing
-
-    Args:
-        checkpointer: Optional checkpointer for state persistence
-
-    Returns:
-        Compiled StateGraph
+    Architecture:
+    - Orchestrator analyzes and decides: plan, route, parallel, or respond
+    - Planner creates multi-step execution plans with parallel grouping
+    - Subagents execute specific tasks (can run in parallel)
+    - Subagents return to Orchestrator for next steps or final response
     """
     client_manager.initialize_client()
     workflow = StateGraph(AgentState, config_schema=Configuration)
 
-    # Core node - Deep Agent handles orchestration
-    workflow.add_node("deep_agent", deep_agent_node)
+    # Add core nodes
+    workflow.add_node("orchestrator_node", orchestrator_node)
+    workflow.add_node("planner_node", planner_node)
 
-    # Optional: Knowledge capture for learning from responses
+    # Add subagent nodes
+    workflow.add_node("semantic_analyst", semantic_analyst)
+    workflow.add_node("report_analyst", report_analyst)
+    workflow.add_node("system_specialist", system_specialist)
+
+    # Optional: Knowledge capture
     workflow.add_node("knowledge_capture_node", knowledge_capture_node)
 
     # Set entry point
-    workflow.set_entry_point("deep_agent")
+    workflow.set_entry_point("orchestrator_node")
 
-    # Simple linear flow: deep_agent -> knowledge_capture -> END
-    workflow.add_edge("deep_agent", "knowledge_capture_node")
-    workflow.add_edge("knowledge_capture_node", END)
+    # Orchestrator routing (supports parallel via Send)
+    workflow.add_conditional_edges(
+        "orchestrator_node",
+        route_after_orchestrator,
+    )
+
+    # Planner routing (supports parallel via Send)
+    workflow.add_conditional_edges(
+        "planner_node",
+        route_after_planner,
+    )
+
+    # All subagents return to orchestrator for next steps
+    workflow.add_edge("semantic_analyst", "orchestrator_node")
+    workflow.add_edge("report_analyst", "orchestrator_node")
+    workflow.add_edge("system_specialist", "orchestrator_node")
 
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

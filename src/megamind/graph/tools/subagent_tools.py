@@ -56,18 +56,16 @@ async def create_plan(query: str) -> str:
 ## Available Specialists
 | Specialist | Use For |
 |------------|---------|
-| Business Process Analyst | Understanding processes, doctypes, schemas |
-| Workflow Analyst | Workflow states, transitions, approvals |
-| Report Analyst | Generating and analyzing reports |
-| System Specialist | CRUD operations, document search, system health |
-| Transaction Specialist | Bank reconciliation, stock entries |
+| knowledge | Understanding processes, schemas, workflows, organizational info |
+| report | Generating and analyzing reports, financial statements |
+| operations | CRUD operations, document search, workflow actions (submit, approve) |
 
 ## Output Format
 Return a JSON array of steps:
 ```json
 [
-    {"step": 1, "specialist": "Business Process Analyst", "task": "Find the doctype schema for Sales Order"},
-    {"step": 2, "specialist": "System Specialist", "task": "Create the Sales Order with the required fields"}
+    {"step": 1, "specialist": "knowledge", "task": "Find the required fields for Sales Order"},
+    {"step": 2, "specialist": "operations", "task": "Create the Sales Order with the required fields"}
 ]
 ```
 
@@ -86,29 +84,30 @@ Only output the JSON, no additional text."""
 
 
 @tool
-async def call_business_process_analyst(query: str) -> str:
+async def call_semantic_analyst(query: str) -> str:
     """
-    Call the Business Process Analyst specialist.
+    Call the Semantic Analyst specialist.
 
     Use this for:
     - Understanding business processes and workflows
     - Getting doctype schemas and field information
-    - Searching the knowledge graph for process definitions
+    - Searching knowledge graphs for process and workflow definitions
+    - Workflow state management and transitions
 
     Args:
-        query: The specific question or task for the Business Process Analyst.
+        query: The specific question or task for the Semantic Analyst.
 
     Returns:
         The specialist's response.
     """
     from langchain.agents import create_agent
-    from megamind.graph.tools.titan_knowledge_tools import (
-        search_erpnext_knowledge,
-        get_erpnext_knowledge_by_id,
+    from megamind.graph.tools.zep_graph_tools import (
+        search_business_workflows,
+        search_employees,
     )
-    from megamind.prompts.subagent_prompts import BUSINESS_PROCESS_ANALYST_PROMPT
+    from megamind.prompts.subagent_prompts import SEMANTIC_ANALYST_PROMPT
 
-    logger.debug("---BUSINESS PROCESS ANALYST TOOL---")
+    logger.debug("---SEMANTIC ANALYST TOOL---")
 
     config = Configuration()
     mcp_client = client_manager.get_client()
@@ -116,6 +115,7 @@ async def call_business_process_analyst(query: str) -> str:
 
     all_mcp_tools = await mcp_client.get_tools()
     target_tool_names = [
+        # Schema/DocType tools
         "find_doctypes",
         "get_module_list",
         "get_doctypes_in_module",
@@ -126,55 +126,19 @@ async def call_business_process_analyst(query: str) -> str:
         "get_naming_info",
         "get_required_fields",
         "get_frappe_usage_info",
+        # Workflow tools
+        "get_workflow_state",
+        "apply_workflow",
     ]
     filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
 
     local_tools = [
-        search_erpnext_knowledge,
-        get_erpnext_knowledge_by_id,
+        search_business_workflows,
+        search_employees,
     ]
     tools = filtered_mcp_tools + local_tools
 
-    agent = create_agent(
-        llm, tools=tools, system_prompt=BUSINESS_PROCESS_ANALYST_PROMPT
-    )
-    response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
-
-    return response["messages"][-1].content
-
-
-@tool
-async def call_workflow_analyst(query: str) -> str:
-    """
-    Call the Workflow Analyst specialist.
-
-    Use this for:
-    - Understanding workflow states and transitions
-    - Applying workflow actions (submit, approve, reject)
-    - Getting available actions for a document
-
-    Args:
-        query: The specific question or task for the Workflow Analyst.
-
-    Returns:
-        The specialist's response.
-    """
-    from langchain.agents import create_agent
-    from megamind.prompts.subagent_prompts import WORKFLOW_ANALYST_PROMPT
-
-    logger.debug("---WORKFLOW ANALYST TOOL---")
-
-    config = Configuration()
-    mcp_client = client_manager.get_client()
-    llm = config.get_chat_model()
-
-    all_mcp_tools = await mcp_client.get_tools()
-    target_tool_names = ["get_workflow_state", "apply_workflow"]
-    filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
-
-    tools = filtered_mcp_tools
-
-    agent = create_agent(llm, tools=tools, system_prompt=WORKFLOW_ANALYST_PROMPT)
+    agent = create_agent(llm, tools=tools, system_prompt=SEMANTIC_ANALYST_PROMPT)
     response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
 
     return response["messages"][-1].content
@@ -283,54 +247,10 @@ async def call_system_specialist(query: str) -> str:
     return response["messages"][-1].content
 
 
-@tool
-async def call_transaction_specialist(query: str) -> str:
-    """
-    Call the Transaction Specialist.
-
-    Use this for:
-    - Bank reconciliation
-    - Smart stock entries
-    - Other complex financial transactions
-
-    WARNING: These are high-impact operations. Ensure you have all required info.
-
-    Args:
-        query: The specific question or task for the Transaction Specialist.
-
-    Returns:
-        The specialist's response.
-    """
-    from langchain.agents import create_agent
-    from megamind.prompts.subagent_prompts import TRANSACTION_SPECIALIST_PROMPT
-
-    logger.debug("---TRANSACTION SPECIALIST TOOL---")
-
-    config = Configuration()
-    mcp_client = client_manager.get_client()
-    llm = config.get_chat_model()
-
-    all_mcp_tools = await mcp_client.get_tools()
-    target_tool_names = [
-        "reconcile_bank_transaction_with_vouchers",
-        "create_smart_stock_entry",
-    ]
-    filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
-
-    agent = create_agent(
-        llm, tools=filtered_mcp_tools, system_prompt=TRANSACTION_SPECIALIST_PROMPT
-    )
-    response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
-
-    return response["messages"][-1].content
-
-
 # Export all tools for the Orchestrator
 ORCHESTRATOR_TOOLS = [
     create_plan,
-    call_business_process_analyst,
-    call_workflow_analyst,
+    call_semantic_analyst,
     call_report_analyst,
     call_system_specialist,
-    call_transaction_specialist,
 ]

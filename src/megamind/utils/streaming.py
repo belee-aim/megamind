@@ -36,23 +36,13 @@ def extract_text_content(content):
 
 # Agent display names for user-friendly output
 AGENT_DISPLAY_NAMES = {
-    # Deep Agent orchestrator
-    "deep_agent": "Orchestrator",
-    # Legacy node names (kept for backwards compatibility during migration)
+    # Core LangGraph nodes
     "orchestrator_node": "Orchestrator",
     "planner_node": "Planner",
-    "synthesizer_node": "Synthesizer",
-    # Subagent names (Deep Agents format)
-    "knowledge-analyst": "Knowledge Analyst",
-    "knowledge_analyst": "Knowledge Analyst",
-    "report-analyst": "Report Analyst",
+    # Subagent nodes
+    "semantic_analyst": "Semantic Analyst",
     "report_analyst": "Report Analyst",
-    "system-specialist": "System Specialist",
     "system_specialist": "System Specialist",
-    "transaction-specialist": "Transaction Specialist",
-    "transaction_specialist": "Transaction Specialist",
-    "document-specialist": "Document Specialist",
-    "document_specialist": "Document Specialist",
 }
 
 
@@ -86,7 +76,7 @@ async def stream_response_with_ping(
     ai_response_content = []
 
     # Agents that use structured output - their streaming is "reasoning"
-    # Synthesizer is NOT included because it produces actual user-facing responses
+    # These agents do planning/routing, their output is not user-facing
     # Note: Deep Agent does planning but also produces user-facing responses,
     # so we DON'T include it here to ensure responses stream to user
     STRUCTURED_OUTPUT_AGENTS = {

@@ -6,9 +6,9 @@ from megamind.utils.config import settings
 @tool
 async def search_document(query: str) -> str:
     """
-    Search for documents using graph-based search.
+    Search for documents uploaded in the system's Document Management System(DMS) using graph-based search.
 
-    Use this when you need to find documents, records, or entities
+    Use this tool when you need to find documents, records, or entities
     that match a natural language query.
 
     Args:

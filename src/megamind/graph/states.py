@@ -9,9 +9,19 @@ class AgentState(TypedDict):
     access_token: str | None
     user_consent_response: str | None
 
-    # Note: Orchestrator routing fields removed - handled by Deep Agents internally
-    # Previously had: next_action, target_specialist, current_plan, plan_step_index,
-    # specialist_results, execution_groups, current_group_index, pending_specialists
+    # Orchestrator routing fields
+    next_action: str | None  # "plan", "route", "parallel", "respond", "synthesize"
+    target_specialist: str | None  # "semantic", "report", "system"
+    current_plan: List[Dict[str, Any]] | None  # Plan steps from Planner
+    plan_step_index: int | None  # Current step being executed
+    specialist_results: List[str] | None  # Results from subagent executions
+
+    # Parallel execution fields
+    execution_groups: (
+        List[List[Dict[str, Any]]] | None
+    )  # Grouped steps for parallel execution
+    current_group_index: int | None  # Current group being executed
+    pending_specialists: List[str] | None  # Specialists pending in current group
 
     # Enhanced stock movement agent state fields
     validation_context: Dict[str, Any] | None
