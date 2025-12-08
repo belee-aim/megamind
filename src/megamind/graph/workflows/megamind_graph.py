@@ -13,21 +13,21 @@ from megamind.graph.nodes.planner import planner_node
 from megamind.graph.nodes.knowledge_capture_node import knowledge_capture_node
 
 # Import subagents
-from megamind.graph.agents.semantic_analyst import semantic_analyst
+from megamind.graph.agents.knowledge_analyst import knowledge_analyst
 from megamind.graph.agents.report_analyst import report_analyst
-from megamind.graph.agents.system_specialist import system_specialist
+from megamind.graph.agents.operations_specialist import operations_specialist
 
 
 SPECIALIST_MAP = {
-    # New names (knowledge, report, operations)
-    "knowledge": "semantic_analyst",
+    # Primary names
+    "knowledge": "knowledge_analyst",
     "report": "report_analyst",
-    "operations": "system_specialist",
+    "operations": "operations_specialist",
     # Legacy names for backward compatibility
-    "business_process": "semantic_analyst",
-    "workflow": "semantic_analyst",
-    "semantic": "semantic_analyst",
-    "system": "system_specialist",
+    "business_process": "knowledge_analyst",
+    "workflow": "knowledge_analyst",
+    "semantic": "knowledge_analyst",
+    "system": "operations_specialist",
 }
 
 
@@ -94,9 +94,9 @@ async def build_megamind_graph(checkpointer: Optional[AsyncPostgresSaver] = None
     workflow.add_node("planner_node", planner_node)
 
     # Add subagent nodes
-    workflow.add_node("semantic_analyst", semantic_analyst)
+    workflow.add_node("knowledge_analyst", knowledge_analyst)
     workflow.add_node("report_analyst", report_analyst)
-    workflow.add_node("system_specialist", system_specialist)
+    workflow.add_node("operations_specialist", operations_specialist)
 
     # Optional: Knowledge capture
     workflow.add_node("knowledge_capture_node", knowledge_capture_node)
@@ -117,9 +117,9 @@ async def build_megamind_graph(checkpointer: Optional[AsyncPostgresSaver] = None
     )
 
     # All subagents return to orchestrator for next steps
-    workflow.add_edge("semantic_analyst", "orchestrator_node")
+    workflow.add_edge("knowledge_analyst", "orchestrator_node")
     workflow.add_edge("report_analyst", "orchestrator_node")
-    workflow.add_edge("system_specialist", "orchestrator_node")
+    workflow.add_edge("operations_specialist", "orchestrator_node")
 
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

@@ -84,18 +84,18 @@ Only output the JSON, no additional text."""
 
 
 @tool
-async def call_semantic_analyst(query: str) -> str:
+async def call_knowledge_analyst(query: str) -> str:
     """
-    Call the Semantic Analyst specialist.
+    Call the Knowledge Analyst specialist.
 
     Use this for:
     - Understanding business processes and workflows
-    - Getting doctype schemas and field information
     - Searching knowledge graphs for process and workflow definitions
-    - Workflow state management and transitions
+    - Finding system documentation and best practices
+    - Searching documents in DMS
 
     Args:
-        query: The specific question or task for the Semantic Analyst.
+        query: The specific question or task for the Knowledge Analyst.
 
     Returns:
         The specialist's response.
@@ -105,40 +105,24 @@ async def call_semantic_analyst(query: str) -> str:
         search_business_workflows,
         search_employees,
     )
-    from megamind.prompts.subagent_prompts import SEMANTIC_ANALYST_PROMPT
+    from megamind.graph.tools.minion_tools import search_document
+    from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
+    from megamind.prompts.subagent_prompts import KNOWLEDGE_ANALYST_PROMPT
 
-    logger.debug("---SEMANTIC ANALYST TOOL---")
+    logger.debug("---KNOWLEDGE ANALYST TOOL---")
 
     config = Configuration()
-    mcp_client = client_manager.get_client()
     llm = config.get_chat_model()
 
-    all_mcp_tools = await mcp_client.get_tools()
-    target_tool_names = [
-        # Schema/DocType tools
-        "find_doctypes",
-        "get_module_list",
-        "get_doctypes_in_module",
-        "check_doctype_exists",
-        "get_doctype_schema",
-        "get_field_options",
-        "get_field_permissions",
-        "get_naming_info",
-        "get_required_fields",
-        "get_frappe_usage_info",
-        # Workflow tools
-        "get_workflow_state",
-        "apply_workflow",
-    ]
-    filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
-
-    local_tools = [
+    # All local/read-only tools - no MCP tools
+    tools = [
         search_business_workflows,
         search_employees,
+        search_erpnext_knowledge,
+        search_document,
     ]
-    tools = filtered_mcp_tools + local_tools
 
-    agent = create_agent(llm, tools=tools, system_prompt=SEMANTIC_ANALYST_PROMPT)
+    agent = create_agent(llm, tools=tools, system_prompt=KNOWLEDGE_ANALYST_PROMPT)
     response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
 
     return response["messages"][-1].content
@@ -190,28 +174,26 @@ async def call_report_analyst(query: str) -> str:
 
 
 @tool
-async def call_system_specialist(query: str) -> str:
+async def call_operations_specialist(query: str) -> str:
     """
-    Call the System Specialist.
+    Call the Operations Specialist.
 
     Use this for:
+    - Getting doctype schemas and field information
     - Creating, reading, updating, deleting documents (CRUD)
-    - Searching for documents
-    - Checking system health
+    - Workflow state management and transitions
     - Getting required fields for a doctype
 
     Args:
-        query: The specific question or task for the System Specialist.
+        query: The specific question or task for the Operations Specialist.
 
     Returns:
         The specialist's response.
     """
     from langchain.agents import create_agent
-    from megamind.graph.tools.minion_tools import search_document
-    from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
-    from megamind.prompts.subagent_prompts import SYSTEM_SPECIALIST_PROMPT
+    from megamind.prompts.subagent_prompts import OPERATIONS_SPECIALIST_PROMPT
 
-    logger.debug("---SYSTEM SPECIALIST TOOL---")
+    logger.debug("---OPERATIONS SPECIALIST TOOL---")
 
     config = Configuration()
     mcp_client = client_manager.get_client()
@@ -219,6 +201,18 @@ async def call_system_specialist(query: str) -> str:
 
     all_mcp_tools = await mcp_client.get_tools()
     target_tool_names = [
+        # Schema/DocType tools
+        "find_doctypes",
+        "get_module_list",
+        "get_doctypes_in_module",
+        "check_doctype_exists",
+        "get_doctype_schema",
+        "get_field_options",
+        "get_field_permissions",
+        "get_naming_info",
+        "get_required_fields",
+        "get_frappe_usage_info",
+        # Document CRUD
         "create_document",
         "get_document",
         "update_document",
@@ -226,11 +220,16 @@ async def call_system_specialist(query: str) -> str:
         "list_documents",
         "check_document_exists",
         "get_document_count",
+        # Validation
         "validate_document_enhanced",
         "get_document_status",
+        # Link field helpers
         "search_link_options",
         "get_paginated_options",
-        "get_required_fields",
+        # Workflow actions
+        "get_workflow_state",
+        "apply_workflow",
+        # System utilities
         "version",
         "ping",
         "call_method",
@@ -238,10 +237,9 @@ async def call_system_specialist(query: str) -> str:
     ]
     filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
 
-    local_tools = [search_document, search_erpnext_knowledge]
-    tools = filtered_mcp_tools + local_tools
-
-    agent = create_agent(llm, tools=tools, system_prompt=SYSTEM_SPECIALIST_PROMPT)
+    agent = create_agent(
+        llm, tools=filtered_mcp_tools, system_prompt=OPERATIONS_SPECIALIST_PROMPT
+    )
     response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
 
     return response["messages"][-1].content
@@ -250,7 +248,7 @@ async def call_system_specialist(query: str) -> str:
 # Export all tools for the Orchestrator
 ORCHESTRATOR_TOOLS = [
     create_plan,
-    call_semantic_analyst,
+    call_knowledge_analyst,
     call_report_analyst,
-    call_system_specialist,
+    call_operations_specialist,
 ]

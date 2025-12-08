@@ -5,10 +5,8 @@ from langchain.agents import create_agent
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.states import AgentState
-from megamind.graph.tools.minion_tools import search_document
-from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
 from megamind.graph.tools.consent_wrapper import wrap_tools_with_consent
-from megamind.prompts.subagent_prompts import SYSTEM_SPECIALIST_PROMPT
+from megamind.prompts.subagent_prompts import OPERATIONS_SPECIALIST_PROMPT
 
 
 def inject_token(tool, token):
@@ -33,14 +31,18 @@ def inject_token(tool, token):
     return new_tool
 
 
-async def system_specialist(state: AgentState, config: RunnableConfig):
+async def operations_specialist(state: AgentState, config: RunnableConfig):
     """
-    System Specialist subagent.
-    Specializes in system health, API interactions, and document management.
+    Operations Specialist subagent.
 
-    Critical operations (create, update, delete) require user consent.
+    Specializes in:
+    - Schema and DocType information (MCP)
+    - Document CRUD operations (MCP)
+    - Validation and workflow actions (MCP)
+
+    Critical operations (create, update, delete, apply_workflow) require user consent.
     """
-    logger.debug("---SYSTEM SPECIALIST---")
+    logger.debug("---OPERATIONS SPECIALIST---")
 
     configurable = Configuration.from_runnable_config(config)
     mcp_client = client_manager.get_client()
@@ -56,6 +58,17 @@ async def system_specialist(state: AgentState, config: RunnableConfig):
 
     all_mcp_tools = await mcp_client.get_tools()
     target_tool_names = [
+        # Schema/DocType tools (moved from Knowledge Analyst)
+        "find_doctypes",
+        "get_module_list",
+        "get_doctypes_in_module",
+        "check_doctype_exists",
+        "get_doctype_schema",
+        "get_field_options",
+        "get_field_permissions",
+        "get_naming_info",
+        "get_required_fields",
+        "get_frappe_usage_info",
         # Document CRUD
         "create_document",
         "get_document",
@@ -67,11 +80,10 @@ async def system_specialist(state: AgentState, config: RunnableConfig):
         # Validation
         "validate_document_enhanced",
         "get_document_status",
-        "get_required_fields",
         # Link field helpers
         "search_link_options",
         "get_paginated_options",
-        # Workflow actions (WRITE operations)
+        # Workflow actions
         "get_workflow_state",
         "apply_workflow",
         # System utilities
@@ -91,10 +103,10 @@ async def system_specialist(state: AgentState, config: RunnableConfig):
     # Wrap critical MCP tools with consent mechanism
     filtered_mcp_tools = wrap_tools_with_consent(filtered_mcp_tools)
 
-    local_tools = [search_document, search_erpnext_knowledge]
-    tools = filtered_mcp_tools + local_tools
+    # All tools are MCP tools - no local tools needed
+    tools = filtered_mcp_tools
 
-    prompt = SYSTEM_SPECIALIST_PROMPT + task_context
+    prompt = OPERATIONS_SPECIALIST_PROMPT + task_context
     agent = create_agent(llm, tools=tools, system_prompt=prompt)
 
     messages = state.get("messages", [])

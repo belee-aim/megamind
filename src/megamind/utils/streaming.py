@@ -40,9 +40,9 @@ AGENT_DISPLAY_NAMES = {
     "orchestrator_node": "Orchestrator",
     "planner_node": "Planner",
     # Subagent nodes
-    "semantic_analyst": "Semantic Analyst",
+    "knowledge_analyst": "Knowledge Analyst",
     "report_analyst": "Report Analyst",
-    "system_specialist": "System Specialist",
+    "operations_specialist": "Operations Specialist",
 }
 
 
