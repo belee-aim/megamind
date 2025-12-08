@@ -29,7 +29,7 @@ async def search_business_workflows(
     Args:
         query: Natural language search query (e.g., "sales order approval process")
         scope: What to search - "edges" (relationships/facts) or "nodes" (entities)
-        limit: Maximum results to return (default: 10)
+        limit: Maximum results to return (default: 10, max: 50)
 
     Returns:
         Matching workflow and process information from the knowledge graph.
@@ -45,8 +45,8 @@ async def search_business_workflows(
             return "Zep client not available. Unable to search business workflows."
 
         results = await zep_client.search_graph(
-            user_id="business_workflows_json",
             query=query,
+            user_id="business_workflows_json",
             scope=scope,
             limit=limit,
         )
@@ -103,7 +103,7 @@ async def search_employees(
     Args:
         query: Natural language search query (e.g., "finance department manager")
         scope: What to search - "nodes" (entities) or "edges" (relationships)
-        limit: Maximum results to return (default: 10)
+        limit: Maximum results to return (default: 10, max: 50)
 
     Returns:
         Matching employee and organizational information.
@@ -119,8 +119,8 @@ async def search_employees(
             return "Zep client not available. Unable to search employees."
 
         results = await zep_client.search_graph(
-            user_id="employees",
             query=query,
+            user_id="employees",
             scope=scope,
             limit=limit,
         )
@@ -172,9 +172,9 @@ async def search_user_knowledge(
 
     Args:
         query: Natural language search query
-        user_email: The user's email address (used as graph_id)
+        user_email: The user's email address (used as user_id)
         scope: What to search - "edges" (facts) or "nodes" (entities)
-        limit: Maximum results to return (default: 10)
+        limit: Maximum results to return (default: 10, max: 50)
 
     Returns:
         Matching information from the user's personal knowledge graph.
@@ -190,8 +190,8 @@ async def search_user_knowledge(
             return "Zep client not available. Unable to search user knowledge."
 
         results = await zep_client.search_graph(
-            user_id=user_email,
             query=query,
+            user_id=user_email,
             scope=scope,
             limit=limit,
         )

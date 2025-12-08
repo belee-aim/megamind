@@ -394,33 +394,74 @@ class ZepClient:
 
     async def search_graph(
         self,
-        user_id: str,
         query: str,
+        user_id: Optional[str] = None,
+        graph_id: Optional[str] = None,
         scope: str = "edges",
         limit: int = 10,
+        bfs_origin_node_uuids: Optional[List[str]] = None,
+        center_node_uuid: Optional[str] = None,
+        min_fact_rating: Optional[float] = None,
+        mmr_lambda: Optional[float] = None,
+        reranker: Optional[str] = None,
+        search_filters: Optional[dict] = None,
     ) -> List[dict]:
         """
-        Search the user's knowledge graph.
+        Search the user's knowledge graph using Zep's graph search.
 
         Args:
-            user_id: The user whose graph to search
-            query: Natural language search query
-            scope: What to search - "edges" (facts), "nodes" (entities), or "episodes"
-            limit: Maximum results to return
+            query: The string to search for (required)
+            user_id: The user_id when searching user graph. If not searching
+                     user graph, please use graph_id instead.
+            graph_id: The graph_id to search in. When searching user graph,
+                      please use user_id instead.
+            scope: What to search - "edges" (facts/default), "nodes" (entities).
+                   Communities will be added in the future.
+            limit: Maximum number of facts to retrieve. Defaults to 10. Limited to 50.
+            bfs_origin_node_uuids: Nodes that are the origins of the BFS searches
+            center_node_uuid: Node to rerank around for node distance reranking
+            min_fact_rating: The minimum rating by which to filter relevant facts
+            mmr_lambda: Weighting for maximal marginal relevance
+            reranker: Reranker to use. Defaults to RRF.
+            search_filters: Search filters to apply to the search
 
         Returns:
-            List of search results
+            List of search results (edges or nodes based on scope)
         """
         if not self.is_available():
             return []
 
+        if not user_id and not graph_id:
+            logger.error("Either user_id or graph_id must be provided for graph search")
+            return []
+
         try:
-            results = await self.client.graph.search(
-                user_id=user_id,
-                query=query,
-                scope=scope,
-                limit=limit,
-            )
+            # Build kwargs, only including non-None values
+            search_kwargs = {
+                "query": query,
+                "limit": limit,
+            }
+
+            if user_id:
+                search_kwargs["user_id"] = user_id
+            if graph_id:
+                search_kwargs["graph_id"] = graph_id
+            if scope:
+                search_kwargs["scope"] = scope
+            if bfs_origin_node_uuids:
+                search_kwargs["bfs_origin_node_uuids"] = bfs_origin_node_uuids
+            if center_node_uuid:
+                search_kwargs["center_node_uuid"] = center_node_uuid
+            if min_fact_rating is not None:
+                search_kwargs["min_fact_rating"] = min_fact_rating
+            if mmr_lambda is not None:
+                search_kwargs["mmr_lambda"] = mmr_lambda
+            if reranker:
+                search_kwargs["reranker"] = reranker
+            if search_filters:
+                search_kwargs["search_filters"] = search_filters
+
+            results = await self.client.graph.search(**search_kwargs)
 
             # Extract edges/nodes based on scope
             if scope == "edges" and hasattr(results, "edges"):
@@ -436,7 +477,7 @@ class ZepClient:
 
             return []
         except Exception as e:
-            logger.error(f"Error searching Zep graph for user {user_id}: {e}")
+            logger.error(f"Error searching Zep graph: {e}")
             return []
 
 

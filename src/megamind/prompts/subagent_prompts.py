@@ -23,8 +23,10 @@ The System is an ERP with interconnected DocTypes:
 ### Knowledge Graph Search (Zep)
 | Tool | Use For |
 |------|---------|
-| `search_business_workflows(query)` | Business processes, approval chains, end-to-end flows, SOPs |
-| `search_employees(query)` | Org structure, departments, reporting relationships, roles |
+| `search_business_workflows(query, scope, limit)` | Business processes, approval chains, end-to-end flows, SOPs |
+| `search_employees(query, scope, limit)` | Org structure, departments, reporting relationships, roles |
+
+**Parameters:** `scope` = "edges" (facts) or "nodes" (entities), `limit` = max results (default: 10)
 
 ### Schema & Workflow Information (MCP)
 | Tool | Use For |
