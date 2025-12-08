@@ -46,7 +46,7 @@ async def search_business_workflows(
 
         results = await zep_client.search_graph(
             query=query,
-            user_id="business_workflows_json",
+            graph_id="business_workflows_json",
             scope=scope,
             limit=limit,
         )
@@ -120,7 +120,7 @@ async def search_employees(
 
         results = await zep_client.search_graph(
             query=query,
-            user_id="employees",
+            graph_id="employees",
             scope=scope,
             limit=limit,
         )
