@@ -36,7 +36,6 @@ dependencies = [
     "sentry-sdk[fastapi]>=2.38.0",
     "firebase-admin>=6.5.0",
     "zep-cloud>=3.13.0",
-    "deepagents>=0.2.0",
 ]
 
 [dependency-groups]
