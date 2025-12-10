@@ -45,7 +45,7 @@ async def knowledge_analyst(state: AgentState, config: RunnableConfig):
         search_employees,
         # Local search tools
         search_erpnext_knowledge,
-        # search_document,
+        search_document,
     ]
 
     # Create agent
