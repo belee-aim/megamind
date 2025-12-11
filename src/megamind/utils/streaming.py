@@ -34,17 +34,6 @@ def extract_text_content(content):
     return str(content)
 
 
-# Agent display names for user-friendly output
-AGENT_DISPLAY_NAMES = {
-    # Core LangGraph nodes
-    "orchestrator_node": "Orchestrator",
-    # Subagent nodes
-    "knowledge_analyst": "Knowledge Analyst",
-    "report_analyst": "Report Analyst",
-    "operations_specialist": "Operations Specialist",
-}
-
-
 async def stream_response_with_ping(
     graph, inputs, config, provider=None, zep_client=None, zep_thread_id=None
 ):
@@ -52,9 +41,7 @@ async def stream_response_with_ping(
     Streams responses from the graph with agent status visibility.
 
     Events:
-    - agent_start: When an agent begins processing
-    - agent_reasoning: Agent's internal reasoning/planning (from structured output agents)
-    - agent_thinking: Agent's final decision summary (from structured output)
+    - agent_reasoning: Agent's internal reasoning/planning content
     - agent_tool_call: When agent calls a tool
     - stream_event: Actual user-facing response content
     - done: Stream complete
@@ -90,7 +77,6 @@ async def stream_response_with_ping(
         try:
             current_agent = None
 
-            # Use 'updates' stream mode to see node-level updates
             async for event in graph.astream_events(inputs, config, version="v2"):
                 event_type = event.get("event")
                 event_name = event.get("name", "")
@@ -100,94 +86,52 @@ async def stream_response_with_ping(
                 # Try to get langgraph_node from metadata for more accurate agent tracking
                 langgraph_node = metadata.get("langgraph_node", "")
 
-                # Detect node/agent starts
+                # Track current agent from node starts
                 if event_type == "on_chain_start":
-                    # Check if this is a known agent node
                     check_name = langgraph_node or event_name
-                    if check_name in AGENT_DISPLAY_NAMES:
+                    if check_name:
                         current_agent = check_name
-                        display_name = AGENT_DISPLAY_NAMES.get(check_name, check_name)
-
                         # Reset orchestrator phase when it starts a new cycle
                         if check_name == "orchestrator_node":
                             orchestrator_phase["phase"] = "routing"
 
-                        await queue.put(
-                            {
-                                "type": "agent_start",
-                                "agent": check_name,
-                                "display_name": display_name,
-                            }
-                        )
-
-                # Detect agent decisions/reasoning (from structured output)
-                if event_type == "on_chain_end" and current_agent:
+                # Detect agent decisions (from structured output) to switch orchestrator phase
+                if (
+                    event_type == "on_chain_end"
+                    and current_agent == "orchestrator_node"
+                ):
                     output = event_data.get("output", {})
-
-                    # Check for orchestrator/agent structured output decisions
                     if isinstance(output, dict):
-                        reasoning = ""
-                        action = ""
-                        target = ""
-
                         # Handle OrchestratorDecision (respond or route)
                         if "action" in output and output.get("action") in [
                             "respond",
                             "route",
                         ]:
-                            reasoning = output.get("reasoning", "")
-                            action = output.get("action", "")
-                            target = output.get("target_specialist", "")
-                            # Decision made, next phase is responding
+                            orchestrator_phase["phase"] = "responding"
+                        # Handle legacy next_action format
+                        elif (
+                            "next_action" in output
+                            and output.get("next_action") == "respond"
+                        ):
                             orchestrator_phase["phase"] = "responding"
 
-                        # Handle legacy next_action format
-                        elif "next_action" in output:
-                            reasoning = output.get("reasoning", "")
-                            action = output.get("next_action", "")
-                            target = output.get("target_specialist", "")
-                            if action == "respond":
-                                orchestrator_phase["phase"] = "responding"
-
-                        if reasoning or action:
-                            await queue.put(
-                                {
-                                    "type": "agent_thinking",
-                                    "agent": current_agent,
-                                    "reasoning": reasoning,
-                                    "action": action,
-                                    "target": target,
-                                }
-                            )
-
-                # Detect tool calls - especially 'task' for subagent delegation
+                # Detect tool calls
                 if event_type == "on_tool_start":
                     tool_name = event_name
                     tool_input = event_data.get("input", {})
 
-                    # If this is a 'task' tool, it's a subagent delegation
-                    # Extract the subagent name from subagent_type field
+                    # Update current agent if this is a subagent delegation
                     if tool_name == "task" and isinstance(tool_input, dict):
                         subagent = tool_input.get("subagent_type", "")
-                        if subagent and subagent in AGENT_DISPLAY_NAMES:
+                        if subagent:
                             current_agent = subagent
-                            display_name = AGENT_DISPLAY_NAMES.get(subagent, subagent)
-                            await queue.put(
-                                {
-                                    "type": "agent_start",
-                                    "agent": subagent,
-                                    "display_name": display_name,
-                                }
-                            )
 
                     await queue.put(
                         {
                             "type": "agent_tool_call",
                             "agent": current_agent,
                             "tool": tool_name,
-                            "input_preview": str(tool_input)[
-                                :200
-                            ],  # Truncate for display
+                            "input_preview": str(tool_input)[:200],
                         }
                     )
 
@@ -217,7 +161,6 @@ async def stream_response_with_ping(
                                 is_reasoning = orchestrator_phase["phase"] == "routing"
 
                             if is_reasoning:
-                                # This is reasoning/planning content
                                 await queue.put(
                                     {
                                         "type": "agent_reasoning",
@@ -226,7 +169,6 @@ async def stream_response_with_ping(
                                     }
                                 )
                             else:
-                                # This is actual user-facing response
                                 await queue.put(
                                     {
                                         "type": "stream_event",
@@ -271,30 +213,7 @@ async def stream_response_with_ping(
                 if isinstance(item, dict):
                     event_type = item.get("type", "stream_event")
 
-                    if event_type == "agent_start":
-                        # Send agent start event
-                        data = json.dumps(
-                            {
-                                "agent": item.get("agent"),
-                                "display_name": item.get("display_name"),
-                            }
-                        )
-                        yield f"event: agent_start\ndata: {data}\n\n".encode("utf-8")
-
-                    elif event_type == "agent_thinking":
-                        # Send thinking/reasoning event
-                        data = json.dumps(
-                            {
-                                "agent": item.get("agent"),
-                                "reasoning": item.get("reasoning", ""),
-                                "action": item.get("action", ""),
-                                "target": item.get("target", ""),
-                            }
-                        )
-                        yield f"event: agent_thinking\ndata: {data}\n\n".encode("utf-8")
-
-                    elif event_type == "agent_tool_call":
-                        # Send tool call event
+                    if event_type == "agent_tool_call":
                         data = json.dumps(
                             {
                                 "agent": item.get("agent"),
@@ -307,7 +226,6 @@ async def stream_response_with_ping(
                         )
 
                     elif event_type == "agent_reasoning":
-                        # Send reasoning stream (from orchestrator/planner)
                         data = json.dumps(
                             {
                                 "agent": item.get("agent"),
@@ -319,7 +237,6 @@ async def stream_response_with_ping(
                         )
 
                     elif event_type == "stream_event":
-                        # Send actual response content stream with agent info
                         content = item.get("content", "")
                         agent = item.get("agent")
                         # Collect for Zep sync
