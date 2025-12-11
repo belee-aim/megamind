@@ -399,31 +399,19 @@ class ZepClient:
         graph_id: Optional[str] = None,
         scope: str = "edges",
         limit: int = 10,
-        bfs_origin_node_uuids: Optional[List[str]] = None,
-        center_node_uuid: Optional[str] = None,
-        min_fact_rating: Optional[float] = None,
-        mmr_lambda: Optional[float] = None,
-        reranker: Optional[str] = None,
-        search_filters: Optional[dict] = None,
     ) -> List[dict]:
         """
-        Search the user's knowledge graph using Zep's graph search.
+        Search the knowledge graph using Zep's graph search.
+
+        Optimized for performance - uses minimal parameters.
+        See: https://help.getzep.com/performance
 
         Args:
-            query: The string to search for (required)
-            user_id: The user_id when searching user graph. If not searching
-                     user graph, please use graph_id instead.
-            graph_id: The graph_id to search in. When searching user graph,
-                      please use user_id instead.
-            scope: What to search - "edges" (facts/default), "nodes" (entities).
-                   Communities will be added in the future.
-            limit: Maximum number of facts to retrieve. Defaults to 10. Limited to 50.
-            bfs_origin_node_uuids: Nodes that are the origins of the BFS searches
-            center_node_uuid: Node to rerank around for node distance reranking
-            min_fact_rating: The minimum rating by which to filter relevant facts
-            mmr_lambda: Weighting for maximal marginal relevance
-            reranker: Reranker to use. Defaults to RRF.
-            search_filters: Search filters to apply to the search
+            query: Concise search query (keep it focused for best results)
+            user_id: User ID for user-specific graph search
+            graph_id: Graph ID for shared/company graph search
+            scope: "edges" (facts/default) or "nodes" (entities)
+            limit: Maximum results (default: 10, max: 50)
 
         Returns:
             List of search results (edges or nodes based on scope)
@@ -436,30 +424,17 @@ class ZepClient:
             return []
 
         try:
-            # Build kwargs, only including non-None values
+            # Minimal search params for optimal performance
             search_kwargs = {
                 "query": query,
                 "limit": limit,
+                "scope": scope,
             }
 
             if user_id:
                 search_kwargs["user_id"] = user_id
             if graph_id:
                 search_kwargs["graph_id"] = graph_id
-            if scope:
-                search_kwargs["scope"] = scope
-            if bfs_origin_node_uuids:
-                search_kwargs["bfs_origin_node_uuids"] = bfs_origin_node_uuids
-            if center_node_uuid:
-                search_kwargs["center_node_uuid"] = center_node_uuid
-            if min_fact_rating is not None:
-                search_kwargs["min_fact_rating"] = min_fact_rating
-            if mmr_lambda is not None:
-                search_kwargs["mmr_lambda"] = mmr_lambda
-            if reranker:
-                search_kwargs["reranker"] = reranker
-            if search_filters:
-                search_kwargs["search_filters"] = search_filters
 
             results = await self.client.graph.search(**search_kwargs)
 
@@ -479,6 +454,31 @@ class ZepClient:
         except Exception as e:
             logger.error(f"Error searching Zep graph: {e}")
             return []
+
+    async def warm_user_cache(self, user_id: str) -> bool:
+        """
+        Warm the user's cache for faster retrieval.
+
+        Call this when a user logs in or opens the app.
+        Zep moves user data to a "hot" cache tier for faster access.
+        See: https://help.getzep.com/performance
+
+        Args:
+            user_id: User ID to warm cache for
+
+        Returns:
+            True if successful
+        """
+        if not self.is_available():
+            return False
+
+        try:
+            await self.client.user.warm(user_id=user_id)
+            logger.debug(f"Warmed cache for user: {user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error warming cache for user {user_id}: {e}")
+            return False
 
 
 # Singleton instance
