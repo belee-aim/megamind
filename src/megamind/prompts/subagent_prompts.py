@@ -24,11 +24,9 @@ The System is an ERP (ERPNext) with interconnected DocTypes:
 ### Knowledge Graph Search (Zep)
 | Tool | Use For |
 |------|---------|
-| `search_business_workflows(query, scope, limit)` | **PRIMARY** - Business processes, approval chains, end-to-end flows, SOPs |
-| `search_employees(query, scope, limit)` | Org structure, departments, reporting relationships, roles |
-| `search_user_knowledge(query, user_email, scope, limit)` | User-specific knowledge, preferences, past interactions |
-
-**Parameters:** `scope` = "edges" (facts) or "nodes" (entities), `limit` = max results (default: 10)
+| `search_business_workflows(query)` | **PRIMARY** - Business processes, approval chains, end-to-end flows, SOPs |
+| `search_employees(query)` | Org structure, departments, reporting relationships, roles |
+| `search_user_knowledge(query, user_email)` | User-specific knowledge, preferences, past interactions |
 
 ### Knowledge Search (Local)
 | Tool | Use For |

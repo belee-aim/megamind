@@ -115,6 +115,35 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
     execution_groups = state.get("execution_groups", [])
     current_group_index = state.get("current_group_index", 0)
 
+    # Check if we have specialist results from a simple route (no plan)
+    # This prevents infinite loops where orchestrator keeps routing to the same specialist
+    if specialist_results and not current_plan:
+        logger.debug("Specialist completed simple route, synthesizing response")
+
+        results_text = "\n\n".join(
+            [
+                f"**Result {i + 1}:**\n{result}"
+                for i, result in enumerate(specialist_results)
+            ]
+        )
+
+        synthesis_message = SystemMessage(
+            content=SYNTHESIS_PROMPT.format(results=results_text)
+        )
+        response = await llm.ainvoke([synthesis_message] + messages)
+
+        # Clear specialist results after synthesis
+        logger.debug(
+            "Returning from orchestrator with next_action=respond (synthesis complete)"
+        )
+        return {
+            "messages": [response],
+            "next_action": "respond",
+            "target_specialist": None,
+            "specialist_results": None,
+            "pending_specialists": None,
+        }
+
     # Check if we're in plan execution mode with results to process
     if current_plan and specialist_results:
         # Check if there are more groups to execute

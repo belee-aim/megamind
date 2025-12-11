@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.types import Send
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from typing import List, Optional
+from loguru import logger
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
@@ -38,21 +39,31 @@ def route_after_orchestrator(state: AgentState) -> str | List[Send]:
     Supports parallel execution via Send().
     """
     next_action = state.get("next_action")
+    target = state.get("target_specialist")
+
+    logger.debug(
+        f"route_after_orchestrator: next_action={next_action}, target={target}"
+    )
 
     if next_action == "plan":
+        logger.debug("Routing to planner_node")
         return "planner_node"
     elif next_action == "parallel":
         # Send to multiple specialists in parallel
         pending = state.get("pending_specialists", [])
         if pending:
+            logger.debug(f"Routing in parallel to: {pending}")
             return [
                 Send(SPECIALIST_MAP[s], state) for s in pending if s in SPECIALIST_MAP
             ]
+        logger.debug("No pending specialists, ending")
         return END
     elif next_action == "route":
-        target = state.get("target_specialist")
-        return SPECIALIST_MAP.get(target, END)
+        destination = SPECIALIST_MAP.get(target, END)
+        logger.debug(f"Routing to: {destination}")
+        return destination
     else:  # "respond" or unknown
+        logger.debug(f"Ending graph (next_action={next_action})")
         return END
 
 

@@ -1,8 +1,7 @@
 """
 Tools for searching Zep knowledge graphs.
-
-These tools allow the LLM to search business workflows, employee information,
-and user-specific knowledge stored in Zep's graph database.
+Optimized for performance - uses minimal parameters.
+See: https://help.getzep.com/performance
 """
 
 from langchain_core.tools import tool
@@ -12,31 +11,23 @@ from megamind.clients.zep_client import get_zep_client
 
 
 @tool
-async def search_business_workflows(
-    query: str,
-    scope: str = "edges",
-    limit: int = 10,
-) -> str:
+async def search_business_workflows(query: str) -> str:
     """
-    Search the business workflows knowledge graph for processes, workflows, and procedures.
+    Search the business workflows knowledge graph for processes and procedures.
 
     Use this tool to find:
     - Business processes and their steps
     - Workflow definitions and transitions
     - Approval chains and state machines
-    - End-to-end business flows (e.g., Lead → Opportunity → Quotation → Sales Order)
+    - End-to-end business flows
 
     Args:
-        query: Natural language search query (e.g., "sales order approval process")
-        scope: What to search - "edges" (relationships/facts) or "nodes" (entities)
-        limit: Maximum results to return (default: 10, max: 50)
+        query: Concise search query (e.g., "sales order approval process")
 
     Returns:
-        Matching workflow and process information from the knowledge graph.
+        Matching workflow and process information.
     """
-    logger.info(
-        f"Tool called: search_business_workflows(query='{query[:50]}...', scope={scope})"
-    )
+    logger.info(f"Tool called: search_business_workflows(query='{query[:50]}...')")
 
     try:
         zep_client = get_zep_client()
@@ -47,8 +38,6 @@ async def search_business_workflows(
         results = await zep_client.search_graph(
             query=query,
             graph_id="business_workflows_json",
-            scope=scope,
-            limit=limit,
         )
 
         if not results:
@@ -60,23 +49,11 @@ async def search_business_workflows(
         ]
 
         for i, item in enumerate(results, 1):
-            if scope == "edges":
-                # Edge format: fact/relationship
-                fact = item.get("fact", "")
-                source = item.get("source_node_name", "")
-                target = item.get("target_node_name", "")
-                formatted_parts.append(f"## {i}. {source} → {target}")
-                formatted_parts.append(f"{fact}\n")
-            else:
-                # Node format: entity
-                name = item.get("name", "Unknown")
-                labels = item.get("labels", [])
-                summary = item.get("summary", "")
-                formatted_parts.append(f"## {i}. {name}")
-                if labels:
-                    formatted_parts.append(f"**Type**: {', '.join(labels)}")
-                if summary:
-                    formatted_parts.append(f"{summary}\n")
+            fact = item.get("fact", "")
+            source = item.get("source_node_name", "")
+            target = item.get("target_node_name", "")
+            formatted_parts.append(f"## {i}. {source} → {target}")
+            formatted_parts.append(f"{fact}\n")
 
         return "\n".join(formatted_parts)
 
@@ -86,11 +63,7 @@ async def search_business_workflows(
 
 
 @tool
-async def search_employees(
-    query: str,
-    scope: str = "nodes",
-    limit: int = 10,
-) -> str:
+async def search_employees(query: str) -> str:
     """
     Search the employees knowledge graph for organizational information.
 
@@ -98,19 +71,14 @@ async def search_employees(
     - Employee information (name, role, department)
     - Company structure (departments, branches)
     - Reporting relationships
-    - Contact information
 
     Args:
-        query: Natural language search query (e.g., "finance department manager")
-        scope: What to search - "nodes" (entities) or "edges" (relationships)
-        limit: Maximum results to return (default: 10, max: 50)
+        query: Concise search query (e.g., "finance department manager")
 
     Returns:
         Matching employee and organizational information.
     """
-    logger.info(
-        f"Tool called: search_employees(query='{query[:50]}...', scope={scope})"
-    )
+    logger.info(f"Tool called: search_employees(query='{query[:50]}...')")
 
     try:
         zep_client = get_zep_client()
@@ -121,8 +89,6 @@ async def search_employees(
         results = await zep_client.search_graph(
             query=query,
             graph_id="employees",
-            scope=scope,
-            limit=limit,
         )
 
         if not results:
@@ -132,21 +98,14 @@ async def search_employees(
         formatted_parts = [f"# Employee Search Results ({len(results)} found)\n"]
 
         for i, item in enumerate(results, 1):
-            if scope == "nodes":
-                name = item.get("name", "Unknown")
-                labels = item.get("labels", [])
-                summary = item.get("summary", "")
-                formatted_parts.append(f"## {i}. {name}")
-                if labels:
-                    formatted_parts.append(f"**Type**: {', '.join(labels)}")
-                if summary:
-                    formatted_parts.append(f"{summary}\n")
-            else:
-                fact = item.get("fact", "")
-                source = item.get("source_node_name", "")
-                target = item.get("target_node_name", "")
-                formatted_parts.append(f"## {i}. {source} → {target}")
-                formatted_parts.append(f"{fact}\n")
+            name = item.get("name", "Unknown")
+            labels = item.get("labels", [])
+            summary = item.get("summary", "")
+            formatted_parts.append(f"## {i}. {name}")
+            if labels:
+                formatted_parts.append(f"**Type**: {', '.join(labels)}")
+            if summary:
+                formatted_parts.append(f"{summary}\n")
 
         return "\n".join(formatted_parts)
 
@@ -156,12 +115,7 @@ async def search_employees(
 
 
 @tool
-async def search_user_knowledge(
-    query: str,
-    user_email: str,
-    scope: str = "edges",
-    limit: int = 10,
-) -> str:
+async def search_user_knowledge(query: str, user_email: str) -> str:
     """
     Search a specific user's personal knowledge graph.
 
@@ -171,10 +125,8 @@ async def search_user_knowledge(
     - User-specific information stored over time
 
     Args:
-        query: Natural language search query
-        user_email: The user's email address (used as user_id)
-        scope: What to search - "edges" (facts) or "nodes" (entities)
-        limit: Maximum results to return (default: 10, max: 50)
+        query: Concise search query
+        user_email: The user's email address
 
     Returns:
         Matching information from the user's personal knowledge graph.
@@ -192,8 +144,6 @@ async def search_user_knowledge(
         results = await zep_client.search_graph(
             query=query,
             user_id=user_email,
-            scope=scope,
-            limit=limit,
         )
 
         if not results:
@@ -203,13 +153,8 @@ async def search_user_knowledge(
         formatted_parts = [f"# User Knowledge Search Results ({len(results)} found)\n"]
 
         for i, item in enumerate(results, 1):
-            if scope == "edges":
-                fact = item.get("fact", "")
-                formatted_parts.append(f"{i}. {fact}")
-            else:
-                name = item.get("name", "Unknown")
-                summary = item.get("summary", "")
-                formatted_parts.append(f"{i}. **{name}**: {summary}")
+            fact = item.get("fact", "")
+            formatted_parts.append(f"{i}. {fact}")
 
         return "\n".join(formatted_parts)
 

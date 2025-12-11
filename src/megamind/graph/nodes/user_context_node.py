@@ -48,7 +48,6 @@ async def user_context_node(state: AgentState, config: RunnableConfig):
         results = await zep_client.search_graph(
             query=query,
             user_id=user_email,
-            scope="edges",
             limit=5,  # Keep it small for speed
         )
 

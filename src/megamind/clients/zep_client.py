@@ -397,7 +397,6 @@ class ZepClient:
         query: str,
         user_id: Optional[str] = None,
         graph_id: Optional[str] = None,
-        scope: str = "edges",
         limit: int = 10,
     ) -> List[dict]:
         """
@@ -410,11 +409,10 @@ class ZepClient:
             query: Concise search query (keep it focused for best results)
             user_id: User ID for user-specific graph search
             graph_id: Graph ID for shared/company graph search
-            scope: "edges" (facts/default) or "nodes" (entities)
             limit: Maximum results (default: 10, max: 50)
 
         Returns:
-            List of search results (edges or nodes based on scope)
+            List of search results
         """
         if not self.is_available():
             return []
@@ -428,7 +426,6 @@ class ZepClient:
             search_kwargs = {
                 "query": query,
                 "limit": limit,
-                "scope": scope,
             }
 
             if user_id:
@@ -438,16 +435,11 @@ class ZepClient:
 
             results = await self.client.graph.search(**search_kwargs)
 
-            # Extract edges/nodes based on scope
-            if scope == "edges" and hasattr(results, "edges"):
+            # Extract edges from results
+            if hasattr(results, "edges"):
                 return [
                     edge.model_dump() if hasattr(edge, "model_dump") else dict(edge)
                     for edge in (results.edges or [])
-                ]
-            elif scope == "nodes" and hasattr(results, "nodes"):
-                return [
-                    node.model_dump() if hasattr(node, "model_dump") else dict(node)
-                    for node in (results.nodes or [])
                 ]
 
             return []
