@@ -19,7 +19,9 @@ You are Aimee, an intelligent orchestrator helping {user_name} ({user_email}) wi
 - **Current Time**: {current_datetime}
 
 ## Your Role
-Analyze the user's request and route to the right specialist OR respond directly if the answer is obvious.
+Analyze the user's request and decide how to handle it:
+1. **Respond directly** when you have all the information needed to answer
+2. **Route to a specialist** when you need more information or need to perform an action
 
 **Important**: The company has already configured their business processes in the knowledge graph. 
 Route to the **knowledge** specialist to retrieve company-specific workflows and processes.
@@ -32,78 +34,74 @@ Route to the **knowledge** specialist to retrieve company-specific workflows and
 | **report** | Get reports, analytics, financial data | "Show revenue this month", "Stock balance report", "Accounts receivable aging" |
 | **operations** | Create, update, delete documents, perform workflow actions | "Create a sales order", "Submit this invoice", "Update customer address" |
 
+## Multi-Step Operations Pattern
+
+For operations (create, update, delete), follow this pattern:
+1. **First**: Route to `knowledge` to understand the business process and required fields
+2. **Then**: Route to `operations` to execute the action with the knowledge gathered
+
+Example: User says "Create a sales order"
+- Step 1: Route to `knowledge` → get Sales Order workflow and required fields
+- Step 2: Route to `operations` → create the document using that knowledge
+
 ## 5W3H1R Protocol for Operations
 
 When user requests CREATE, UPDATE, DELETE, or workflow actions, gather this data:
-| Element | What to Check | Examples |
-|---------|---------------|----------|
-| **Who** | Customer, supplier, employee involved | "Which customer?", "For which employee?" |
-| **What** | Document type, items, details | "What items?", "Which document?" |
-| **When** | Date, deadline, schedule | "Delivery date?", "Due date?" |
-| **Where** | Warehouse, location, department | "Which warehouse?", "Target location?" |
-| **Why** | Purpose, reason (optional) | Usually inferred from context |
-| **How** | Process to follow | Fetched from knowledge graph |
-| **How much** | Quantity, amount, price | "How many units?", "Total amount?" |
-| **How long** | Duration, timeline (if applicable) | "Project duration?" |
-| **Result** | Expected outcome | Inferred from operation type |
+| Element | What to Check |
+|---------|---------------|
+| **Who** | Customer, supplier, employee involved |
+| **What** | Document type, items, details |
+| **When** | Date, deadline, schedule |
+| **Where** | Warehouse, location, department |
+| **Why** | Purpose, reason (optional) |
+| **How** | Process to follow (from knowledge) |
+| **How much** | Quantity, amount, price |
+| **How long** | Duration, timeline (if applicable) |
+| **Result** | Expected outcome |
 
-**If critical data is missing (Who, What, How much for orders), ask the user.**
+**If critical data is missing, ask the user before proceeding.**
 
 ## Decision Rules
 
 1. **respond** → Answer directly when:
    - Simple greeting or thanks
-   - **Missing 5W3H1R data** - ask user for clarification
-   - Question can be answered from conversation context
+   - You have gathered all needed information and can provide a complete answer
+   - Need to ask user for missing information
 
-2. **route** → Delegate when:
-   - **Knowledge or Report** queries only
-   - Single query, no operations
+2. **route** → Delegate to a specialist when:
+   - Need to fetch knowledge/process information
+   - Need to generate a report
+   - Need to perform an operation (after having the required knowledge)
 
-3. **plan** → **ALWAYS for operations**:
-   - ANY create, update, delete, or workflow action
-   - Plan MUST include: 1) Knowledge (fetch business flow) → 2) Operations (execute)
-   - Complex multi-step requests
-
-## Execution Context
 {context}
 
-Analyze the request and respond with your decision."""
-
-SYNTHESIS_PROMPT = """Based on the specialist results collected, provide a unified response to the user.
-
-## Specialist Results
-{results}
-
-Synthesize a helpful, complete response that addresses the user's original question."""
+Analyze the current state and decide: respond or route."""
 
 
 class OrchestratorDecision(BaseModel):
-    """Structured output for orchestrator decisions."""
+    """Orchestrator decision: respond directly or route to specialist."""
 
-    reasoning: str = Field(description="Brief explanation of your decision")
-    action: Literal["plan", "route", "respond"] = Field(
-        description="plan=complex task, route=delegate to specialist, respond=answer directly"
-    )
-    target_specialist: Optional[Literal["knowledge", "report", "operations"]] = Field(
-        default=None,
-        description="Required if action=route. knowledge=understand, report=analytics, operations=CRUD/actions",
+    action: Literal["respond", "route"] = Field(
+        description="respond=answer directly or ask for info, route=delegate to specialist"
     )
     response: Optional[str] = Field(
         default=None,
-        description="Your response if action=respond. Include any questions for missing info.",
+        description="Required if action=respond. The direct response to the user.",
     )
+    target_specialist: Optional[Literal["knowledge", "report", "operations"]] = Field(
+        default=None,
+        description="Required if action=route. Which specialist to delegate to.",
+    )
+    reasoning: str = Field(description="Brief explanation of decision", max_length=200)
 
 
 async def orchestrator_node(state: AgentState, config: RunnableConfig):
     """
-    Orchestrator node using plain LLM with structured output.
-    Routes to specialists and synthesizes results.
+    Orchestrator node - decides to respond directly or route to a specialist.
 
-    Flow:
-    1. If there are pending plan steps with specialist results, check if more steps needed
-    2. If all plan steps done, synthesize and respond
-    3. Otherwise, analyze user request and decide action
+    After each specialist returns, the orchestrator re-evaluates:
+    - If more work is needed, route to another specialist
+    - If ready to answer, synthesize and respond
     """
     logger.debug("---ORCHESTRATOR---")
 
@@ -111,107 +109,6 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
     llm = configurable.get_chat_model()
     messages = state.get("messages", [])
     specialist_results = state.get("specialist_results", [])
-    current_plan = state.get("current_plan")
-    execution_groups = state.get("execution_groups", [])
-    current_group_index = state.get("current_group_index", 0)
-
-    # Check if we have specialist results from a simple route (no plan)
-    # This prevents infinite loops where orchestrator keeps routing to the same specialist
-    if specialist_results and not current_plan:
-        logger.debug("Specialist completed simple route, synthesizing response")
-
-        results_text = "\n\n".join(
-            [
-                f"**Result {i + 1}:**\n{result}"
-                for i, result in enumerate(specialist_results)
-            ]
-        )
-
-        synthesis_message = SystemMessage(
-            content=SYNTHESIS_PROMPT.format(results=results_text)
-        )
-        response = await llm.ainvoke([synthesis_message] + messages)
-
-        # Clear specialist results after synthesis
-        logger.debug(
-            "Returning from orchestrator with next_action=respond (synthesis complete)"
-        )
-        return {
-            "messages": [response],
-            "next_action": "respond",
-            "target_specialist": None,
-            "specialist_results": None,
-            "pending_specialists": None,
-        }
-
-    # Check if we're in plan execution mode with results to process
-    if current_plan and specialist_results:
-        # Check if there are more groups to execute
-        if execution_groups and current_group_index < len(execution_groups) - 1:
-            # More groups remaining - advance to next group
-            next_group_index = current_group_index + 1
-            next_group = execution_groups[next_group_index]
-            target_specialists = [step["specialist"] for step in next_group]
-
-            logger.debug(
-                f"Advancing to group {next_group_index + 1}: {target_specialists}"
-            )
-
-            return {
-                "current_group_index": next_group_index,
-                "pending_specialists": target_specialists,
-                "next_action": "parallel" if len(target_specialists) > 1 else "route",
-                "target_specialist": target_specialists[0]
-                if len(target_specialists) == 1
-                else None,
-            }
-
-        # All groups complete - synthesize final response
-        logger.debug("All groups complete, synthesizing final response")
-
-        results_text = "\n\n".join(
-            [
-                f"**Result {i + 1}:**\n{result}"
-                for i, result in enumerate(specialist_results)
-            ]
-        )
-
-        synthesis_message = SystemMessage(
-            content=SYNTHESIS_PROMPT.format(results=results_text)
-        )
-        response = await llm.ainvoke([synthesis_message] + messages)
-
-        # Clear plan state after completion
-        return {
-            "messages": [response],
-            "next_action": "respond",
-            "current_plan": None,
-            "execution_groups": None,
-            "current_group_index": None,
-            "plan_step_index": None,
-            "specialist_results": None,
-            "pending_specialists": None,
-        }
-
-    # Normal orchestration - decide what to do
-    context_parts = []
-
-    # Add user context if available
-    user_context = state.get("user_context")
-    if user_context:
-        context_parts.append(f"## User Knowledge\n{user_context}")
-
-    if current_plan:
-        step_idx = state.get("plan_step_index", 0)
-        context_parts.append(f"Executing plan step {step_idx + 1}/{len(current_plan)}")
-        if specialist_results:
-            context_parts.append(
-                f"Previous results: {len(specialist_results)} collected"
-            )
-
-    execution_context = (
-        "\n".join(context_parts) if context_parts else "New conversation"
-    )
 
     # Extract user context from RunnableConfig
     cfg = config.get("configurable", {}) if config else {}
@@ -220,49 +117,76 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
     user_email = cfg.get("user_email", "N/A")
     user_roles = cfg.get("user_roles", [])
     current_datetime = cfg.get("current_datetime", "N/A")
-
-    # Format roles as comma-separated string
     roles_str = ", ".join(user_roles) if user_roles else "N/A"
 
-    # Create prompt with user context
-    system_message = SystemMessage(
-        content=ORCHESTRATOR_PROMPT.format(
-            company=company,
-            user_name=user_name,
-            user_email=user_email,
-            user_roles=roles_str,
-            current_datetime=current_datetime,
-            context=execution_context,
+    # ========================================
+    # Build context including any specialist results
+    # ========================================
+    context_parts = []
+
+    user_context = state.get("user_context")
+    if user_context:
+        context_parts.append(f"## User Knowledge\n{user_context}")
+
+    # Include specialist results in context so LLM can decide next step
+    if specialist_results:
+        results_text = "\n\n".join(
+            [
+                f"**Specialist Result {i + 1}:**\n{result}"
+                for i, result in enumerate(specialist_results)
+            ]
         )
+        context_parts.append(f"## Previous Specialist Results\n{results_text}")
+
+    execution_context = (
+        "\n".join(context_parts)
+        if context_parts
+        else "## Execution Context\nNew conversation"
     )
 
-    # Use structured output
-    structured_llm = llm.with_structured_output(OrchestratorDecision)
-
+    # ========================================
+    # Make decision: respond or route
+    # ========================================
     try:
-        decision: OrchestratorDecision = await structured_llm.ainvoke(
+        system_message = SystemMessage(
+            content=ORCHESTRATOR_PROMPT.format(
+                company=company,
+                user_name=user_name,
+                user_email=user_email,
+                user_roles=roles_str,
+                current_datetime=current_datetime,
+                context=execution_context,
+            )
+        )
+
+        router = llm.with_structured_output(OrchestratorDecision)
+        decision: OrchestratorDecision = await router.ainvoke(
             [system_message] + messages
         )
 
-        logger.debug(
-            f"Orchestrator decision: {decision.action} -> {decision.target_specialist}"
-        )
+        logger.debug(f"Decision: {decision.action} | reason: {decision.reasoning}")
 
-        # Build response
-        result = {
-            "next_action": decision.action,
-            "target_specialist": decision.target_specialist,
-        }
+        if decision.action == "respond":
+            response_content = (
+                decision.response
+                or "I'm here to help. Could you tell me more about what you need?"
+            )
+            return {
+                "messages": [AIMessage(content=response_content)],
+                "next_action": "respond",
+                "target_specialist": None,
+                "specialist_results": None,  # Clear results after responding
+            }
 
-        # If responding directly, add the message
-        if decision.action == "respond" and decision.response:
-            result["messages"] = [AIMessage(content=decision.response)]
-
-        return result
+        else:  # route
+            # Keep specialist_results when routing - they accumulate
+            return {
+                "next_action": "route",
+                "target_specialist": decision.target_specialist,
+            }
 
     except Exception as e:
         logger.error(f"Orchestrator error: {e}")
-        # Fallback to direct response
         return {
             "next_action": "respond",
             "messages": [

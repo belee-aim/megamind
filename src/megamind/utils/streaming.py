@@ -38,7 +38,6 @@ def extract_text_content(content):
 AGENT_DISPLAY_NAMES = {
     # Core LangGraph nodes
     "orchestrator_node": "Orchestrator",
-    "planner_node": "Planner",
     # Subagent nodes
     "knowledge_analyst": "Knowledge Analyst",
     "report_analyst": "Report Analyst",
@@ -75,17 +74,17 @@ async def stream_response_with_ping(
     # Collect AI response content for Zep sync
     ai_response_content = []
 
-    # Agents that use structured output - their streaming is "reasoning"
-    # These agents do planning/routing, their output is not user-facing
-    # Subagents are included so their intermediate work streams as reasoning,
-    # and only the orchestrator's final synthesis becomes the user response
+    # Agents that ALWAYS use structured output - their streaming is "reasoning"
+    # Note: orchestrator_node has dual modes handled via phase tracking below
     STRUCTURED_OUTPUT_AGENTS = {
-        "orchestrator_node",
-        "planner_node",
         "knowledge_analyst",
         "report_analyst",
         "operations_specialist",
     }
+
+    # Track orchestrator phase: 'routing' (structured output) vs 'responding' (regular LLM)
+    # Starts in routing phase, switches to responding after classification/routing complete
+    orchestrator_phase = {"phase": "routing"}
 
     async def stream_producer():
         try:
@@ -108,6 +107,11 @@ async def stream_response_with_ping(
                     if check_name in AGENT_DISPLAY_NAMES:
                         current_agent = check_name
                         display_name = AGENT_DISPLAY_NAMES.get(check_name, check_name)
+
+                        # Reset orchestrator phase when it starts a new cycle
+                        if check_name == "orchestrator_node":
+                            orchestrator_phase["phase"] = "routing"
+
                         await queue.put(
                             {
                                 "type": "agent_start",
@@ -120,23 +124,41 @@ async def stream_response_with_ping(
                 if event_type == "on_chain_end" and current_agent:
                     output = event_data.get("output", {})
 
-                    # Check for orchestrator decision
+                    # Check for orchestrator/agent structured output decisions
                     if isinstance(output, dict):
-                        if "next_action" in output:
+                        reasoning = ""
+                        action = ""
+                        target = ""
+
+                        # Handle OrchestratorDecision (respond or route)
+                        if "action" in output and output.get("action") in [
+                            "respond",
+                            "route",
+                        ]:
+                            reasoning = output.get("reasoning", "")
+                            action = output.get("action", "")
+                            target = output.get("target_specialist", "")
+                            # Decision made, next phase is responding
+                            orchestrator_phase["phase"] = "responding"
+
+                        # Handle legacy next_action format
+                        elif "next_action" in output:
                             reasoning = output.get("reasoning", "")
                             action = output.get("next_action", "")
                             target = output.get("target_specialist", "")
+                            if action == "respond":
+                                orchestrator_phase["phase"] = "responding"
 
-                            if reasoning or action:
-                                await queue.put(
-                                    {
-                                        "type": "agent_thinking",
-                                        "agent": current_agent,
-                                        "reasoning": reasoning,
-                                        "action": action,
-                                        "target": target,
-                                    }
-                                )
+                        if reasoning or action:
+                            await queue.put(
+                                {
+                                    "type": "agent_thinking",
+                                    "agent": current_agent,
+                                    "reasoning": reasoning,
+                                    "action": action,
+                                    "target": target,
+                                }
+                            )
 
                 # Detect tool calls - especially 'task' for subagent delegation
                 if event_type == "on_tool_start":
@@ -184,8 +206,17 @@ async def stream_response_with_ping(
                             text_content = text_content.replace("ERPNEXT", "ERP")
                             text_content = text_content.replace("erpnext", "ERP")
 
-                            # Determine event type based on current agent
+                            # Determine event type based on current agent and phase
+                            is_reasoning = False
+
                             if current_agent in STRUCTURED_OUTPUT_AGENTS:
+                                # These agents always produce reasoning
+                                is_reasoning = True
+                            elif current_agent == "orchestrator_node":
+                                # Orchestrator: routing phase = reasoning, responding phase = user content
+                                is_reasoning = orchestrator_phase["phase"] == "routing"
+
+                            if is_reasoning:
                                 # This is reasoning/planning content
                                 await queue.put(
                                     {
@@ -196,7 +227,6 @@ async def stream_response_with_ping(
                                 )
                             else:
                                 # This is actual user-facing response
-                                # Include agent info so clients know which agent is responding
                                 await queue.put(
                                     {
                                         "type": "stream_event",

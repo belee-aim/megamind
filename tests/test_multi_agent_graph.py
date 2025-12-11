@@ -15,35 +15,21 @@ async def test_graph_structure():
 
         # Check core nodes exist
         assert "orchestrator_node" in app.nodes
-        assert "planner_node" in app.nodes
 
         # Check subagent nodes
-        assert "semantic_analyst" in app.nodes
+        assert "knowledge_analyst" in app.nodes
         assert "report_analyst" in app.nodes
-        assert "system_specialist" in app.nodes
+        assert "operations_specialist" in app.nodes
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_structured_output():
-    """Test that orchestrator uses structured output."""
+    """Test that orchestrator uses structured output for decision-making."""
     from megamind.graph.nodes.orchestrator import OrchestratorDecision
 
-    # Verify the decision model has required fields
+    # Verify the orchestrator decision model has required fields
     assert hasattr(OrchestratorDecision, "model_fields")
     assert "action" in OrchestratorDecision.model_fields
-    assert "target_specialist" in OrchestratorDecision.model_fields
     assert "response" in OrchestratorDecision.model_fields
-
-
-@pytest.mark.asyncio
-async def test_planner_structured_output():
-    """Test that planner uses structured output."""
-    from megamind.graph.nodes.planner import ExecutionPlan, PlanStep
-
-    # Verify the plan models
-    assert hasattr(ExecutionPlan, "model_fields")
-    assert "steps" in ExecutionPlan.model_fields
-
-    assert hasattr(PlanStep, "model_fields")
-    assert "specialist" in PlanStep.model_fields
-    assert "task" in PlanStep.model_fields
+    assert "target_specialist" in OrchestratorDecision.model_fields
+    assert "reasoning" in OrchestratorDecision.model_fields
