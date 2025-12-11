@@ -119,6 +119,5 @@ async def operations_specialist(state: AgentState, config: RunnableConfig):
         specialist_results.append(new_messages[-1].content)
 
     return {
-        "messages": new_messages,
         "specialist_results": specialist_results,
     }

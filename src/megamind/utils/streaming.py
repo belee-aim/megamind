@@ -77,11 +77,14 @@ async def stream_response_with_ping(
 
     # Agents that use structured output - their streaming is "reasoning"
     # These agents do planning/routing, their output is not user-facing
-    # Note: Deep Agent does planning but also produces user-facing responses,
-    # so we DON'T include it here to ensure responses stream to user
+    # Subagents are included so their intermediate work streams as reasoning,
+    # and only the orchestrator's final synthesis becomes the user response
     STRUCTURED_OUTPUT_AGENTS = {
         "orchestrator_node",
         "planner_node",
+        "knowledge_analyst",
+        "report_analyst",
+        "operations_specialist",
     }
 
     async def stream_producer():

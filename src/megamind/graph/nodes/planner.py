@@ -141,11 +141,6 @@ async def planner_node(state: AgentState, config: RunnableConfig):
             "target_specialist": target_specialists[0]
             if len(target_specialists) == 1
             else None,
-            "messages": [
-                AIMessage(
-                    content=f"I've created a plan: {plan.summary}\n\nExecuting {len(plan_steps)} steps..."
-                )
-            ],
         }
 
     except Exception as e:
