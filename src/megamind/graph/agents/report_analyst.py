@@ -83,9 +83,15 @@ async def report_analyst(state: AgentState, config: RunnableConfig):
     response = await agent.ainvoke(state)
     new_messages = response["messages"][num_old_messages:]
 
+    # Store result for orchestrator with specialist identification
     specialist_results = state.get("specialist_results", []) or []
     if new_messages:
-        specialist_results.append(new_messages[-1].content)
+        specialist_results.append(
+            {
+                "specialist": "report",
+                "result": new_messages[-1].content,
+            }
+        )
 
     return {
         "specialist_results": specialist_results,

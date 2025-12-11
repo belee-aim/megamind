@@ -67,11 +67,23 @@ When user requests CREATE, UPDATE, DELETE, or workflow actions, gather this data
    - Simple greeting or thanks
    - You have gathered all needed information and can provide a complete answer
    - Need to ask user for missing information
+   - Specialists have provided sufficient information to synthesize a response
 
 2. **route** → Delegate to a specialist when:
-   - Need to fetch knowledge/process information
-   - Need to generate a report
-   - Need to perform an operation (after having the required knowledge)
+   - Need to fetch knowledge/process information → route to `knowledge`
+   - Need to generate a report → route to `report`
+   - Need to perform an operation (after having the required knowledge) → route to `operations`
+   - Previous specialist result indicates more work is needed by another specialist
+
+## Evaluating Specialist Results
+
+When you have specialist results, evaluate:
+- **Knowledge results**: Do you now have enough context to answer the user, or do you need to perform an operation?
+- **Report results**: Is the report complete, or does the user need additional reports?
+- **Operations results**: Was the operation successful? Do you need to confirm with the user?
+
+If specialists have provided comprehensive information, synthesize it into a clear response. 
+Do NOT route to the same specialist repeatedly for the same information.
 
 {context}
 
@@ -86,7 +98,7 @@ class OrchestratorDecision(BaseModel):
     )
     response: Optional[str] = Field(
         default=None,
-        description="Required if action=respond. The direct response to the user.",
+        description="Required if action=respond. Synthesize information from specialists and generate a clear response.(This is the final response to the user)",
     )
     target_specialist: Optional[Literal["knowledge", "report", "operations"]] = Field(
         default=None,
@@ -128,12 +140,14 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
     if user_context:
         context_parts.append(f"## User Knowledge\n{user_context}")
 
-    # Include specialist results in context so LLM can decide next step
+    # Include specialist results in context with specialist identification
     if specialist_results:
         results_text = "\n\n".join(
             [
-                f"**Specialist Result {i + 1}:**\n{result}"
-                for i, result in enumerate(specialist_results)
+                f"**{r.get('specialist', 'unknown').title()} Specialist Result:**\n{r.get('result', '')}"
+                if isinstance(r, dict)
+                else f"**Specialist Result:**\n{r}"
+                for r in specialist_results
             ]
         )
         context_parts.append(f"## Previous Specialist Results\n{results_text}")
