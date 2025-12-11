@@ -178,6 +178,11 @@ async def stream_response_with_ping(
                             # Replace newlines and spaces with tokens
                             text_content = text_content.replace("\n", "|new_line|")
                             text_content = text_content.replace(" ", "|space|")
+                            # Normalize ERPNext variations to ERP
+                            text_content = text_content.replace("ERPNext", "ERP")
+                            text_content = text_content.replace("ERP Next", "ERP")
+                            text_content = text_content.replace("ERPNEXT", "ERP")
+                            text_content = text_content.replace("erpnext", "ERP")
 
                             # Determine event type based on current agent
                             if current_agent in STRUCTURED_OUTPUT_AGENTS:

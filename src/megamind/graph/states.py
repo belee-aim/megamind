@@ -9,6 +9,9 @@ class AgentState(TypedDict):
     access_token: str | None
     user_consent_response: str | None
 
+    # User context from Zep knowledge graph
+    user_context: str | None  # Personal knowledge about the user
+
     # Orchestrator routing fields
     next_action: str | None  # "plan", "route", "parallel", "respond", "synthesize"
     target_specialist: str | None  # "semantic", "report", "system"

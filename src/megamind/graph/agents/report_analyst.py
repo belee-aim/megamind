@@ -1,6 +1,7 @@
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from langchain.agents import create_agent
+from langchain.agents.middleware import ToolCallLimitMiddleware
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
@@ -68,7 +69,14 @@ async def report_analyst(state: AgentState, config: RunnableConfig):
             filtered_mcp_tools.append(t)
 
     prompt = REPORT_ANALYST_PROMPT + task_context
-    agent = create_agent(llm, tools=filtered_mcp_tools, system_prompt=prompt)
+    agent = create_agent(
+        llm,
+        tools=filtered_mcp_tools,
+        system_prompt=prompt,
+        middleware=[
+            ToolCallLimitMiddleware(run_limit=10)  # Max 10 tool calls per run
+        ],
+    )
 
     messages = state.get("messages", [])
     num_old_messages = len(messages)

@@ -32,21 +32,38 @@ Route to the **knowledge** specialist to retrieve company-specific workflows and
 | **report** | Get reports, analytics, financial data | "Show revenue this month", "Stock balance report", "Accounts receivable aging" |
 | **operations** | Create, update, delete documents, perform workflow actions | "Create a sales order", "Submit this invoice", "Update customer address" |
 
+## 5W3H1R Protocol for Operations
+
+When user requests CREATE, UPDATE, DELETE, or workflow actions, gather this data:
+| Element | What to Check | Examples |
+|---------|---------------|----------|
+| **Who** | Customer, supplier, employee involved | "Which customer?", "For which employee?" |
+| **What** | Document type, items, details | "What items?", "Which document?" |
+| **When** | Date, deadline, schedule | "Delivery date?", "Due date?" |
+| **Where** | Warehouse, location, department | "Which warehouse?", "Target location?" |
+| **Why** | Purpose, reason (optional) | Usually inferred from context |
+| **How** | Process to follow | Fetched from knowledge graph |
+| **How much** | Quantity, amount, price | "How many units?", "Total amount?" |
+| **How long** | Duration, timeline (if applicable) | "Project duration?" |
+| **Result** | Expected outcome | Inferred from operation type |
+
+**If critical data is missing (Who, What, How much for orders), ask the user.**
+
 ## Decision Rules
 
 1. **respond** → Answer directly when:
    - Simple greeting or thanks
-   - Clarification needed (missing doctype, name, or key info)
+   - **Missing 5W3H1R data** - ask user for clarification
    - Question can be answered from conversation context
 
 2. **route** → Delegate when:
-   - Request clearly maps to ONE specialist
-   - Single action or query
+   - **Knowledge or Report** queries only
+   - Single query, no operations
 
-3. **plan** → Create multi-step plan when:
-   - Request needs MULTIPLE specialists
-   - Complex operation (e.g., "Create invoice and apply payment")
-   - User asks for end-to-end process execution
+3. **plan** → **ALWAYS for operations**:
+   - ANY create, update, delete, or workflow action
+   - Plan MUST include: 1) Knowledge (fetch business flow) → 2) Operations (execute)
+   - Complex multi-step requests
 
 ## Execution Context
 {context}
@@ -149,6 +166,12 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
 
     # Normal orchestration - decide what to do
     context_parts = []
+
+    # Add user context if available
+    user_context = state.get("user_context")
+    if user_context:
+        context_parts.append(f"## User Knowledge\n{user_context}")
+
     if current_plan:
         step_idx = state.get("plan_step_index", 0)
         context_parts.append(f"Executing plan step {step_idx + 1}/{len(current_plan)}")

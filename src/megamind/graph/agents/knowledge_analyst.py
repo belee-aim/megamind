@@ -1,12 +1,14 @@
 from langchain_core.runnables import RunnableConfig
 from loguru import logger
 from langchain.agents import create_agent
+from langchain.agents.middleware import ToolCallLimitMiddleware
 
 from megamind.configuration import Configuration
 from megamind.graph.states import AgentState
 from megamind.graph.tools.zep_graph_tools import (
     search_business_workflows,
     search_employees,
+    search_user_knowledge,
 )
 from megamind.graph.tools.minion_tools import search_document
 from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
@@ -21,6 +23,7 @@ async def knowledge_analyst(state: AgentState, config: RunnableConfig):
     Uses Zep knowledge graphs plus local search tools for:
     - Business processes and workflows (business_workflows_json graph)
     - Employee/organizational information (employees graph)
+    - User-specific knowledge (personal preferences, history)
     - System documentation and best practices (search_erpnext_knowledge)
     - Document search in DMS (search_document)
 
@@ -43,14 +46,22 @@ async def knowledge_analyst(state: AgentState, config: RunnableConfig):
         # Zep graph search tools
         search_business_workflows,
         search_employees,
+        search_user_knowledge,
         # Local search tools
         search_erpnext_knowledge,
         search_document,
     ]
 
-    # Create agent
+    # Create agent with tool call limit and parallel tool calls enabled
     prompt = KNOWLEDGE_ANALYST_PROMPT + task_context
-    agent = create_agent(llm, tools=tools, system_prompt=prompt)
+    agent = create_agent(
+        llm,
+        tools=tools,
+        system_prompt=prompt,
+        middleware=[
+            ToolCallLimitMiddleware(run_limit=10)  # Max 10 tool calls per run
+        ],
+    )
 
     # Invoke agent
     messages = state.get("messages", [])

@@ -11,6 +11,7 @@ from megamind.graph.states import AgentState
 from megamind.graph.nodes.orchestrator import orchestrator_node
 from megamind.graph.nodes.planner import planner_node
 from megamind.graph.nodes.knowledge_capture_node import knowledge_capture_node
+from megamind.graph.nodes.user_context_node import user_context_node
 
 # Import subagents
 from megamind.graph.agents.knowledge_analyst import knowledge_analyst
@@ -81,6 +82,7 @@ async def build_megamind_graph(checkpointer: Optional[AsyncPostgresSaver] = None
     Builds the LangGraph for the Multi-Agent system.
 
     Architecture:
+    - User Context Node fetches user's personal knowledge from Zep
     - Orchestrator analyzes and decides: plan, route, parallel, or respond
     - Planner creates multi-step execution plans with parallel grouping
     - Subagents execute specific tasks (can run in parallel)
@@ -90,6 +92,7 @@ async def build_megamind_graph(checkpointer: Optional[AsyncPostgresSaver] = None
     workflow = StateGraph(AgentState, config_schema=Configuration)
 
     # Add core nodes
+    workflow.add_node("user_context_node", user_context_node)
     workflow.add_node("orchestrator_node", orchestrator_node)
     workflow.add_node("planner_node", planner_node)
 
@@ -101,8 +104,9 @@ async def build_megamind_graph(checkpointer: Optional[AsyncPostgresSaver] = None
     # Optional: Knowledge capture
     workflow.add_node("knowledge_capture_node", knowledge_capture_node)
 
-    # Set entry point
-    workflow.set_entry_point("orchestrator_node")
+    # Set entry point - user context first, then orchestrator
+    workflow.set_entry_point("user_context_node")
+    workflow.add_edge("user_context_node", "orchestrator_node")
 
     # Orchestrator routing (supports parallel via Send)
     workflow.add_conditional_edges(
