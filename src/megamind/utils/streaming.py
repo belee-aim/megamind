@@ -64,22 +64,20 @@ async def stream_response_with_ping(
     # All known agent nodes in the graph
     KNOWN_AGENTS = {
         "orchestrator_node",
+        "orchestrator_response_node",  # Phase 2: streams user-facing response
         "knowledge_analyst",
         "report_analyst",
         "operations_specialist",
     }
 
     # Agents that ALWAYS use structured output - their streaming is "reasoning"
-    # Note: orchestrator_node has dual modes handled via phase tracking below
+    # orchestrator_response_node is NOT here because it streams user content
     STRUCTURED_OUTPUT_AGENTS = {
+        "orchestrator_node",  # Phase 1 decision uses structured output
         "knowledge_analyst",
         "report_analyst",
         "operations_specialist",
     }
-
-    # Track orchestrator phase: 'routing' (structured output) vs 'responding' (regular LLM)
-    # Starts in routing phase, switches to responding after classification/routing complete
-    orchestrator_phase = {"phase": "routing"}
 
     async def stream_producer():
         try:
@@ -109,57 +107,6 @@ async def stream_response_with_ping(
                     if check_name in KNOWN_AGENTS:
                         current_agent = check_name
                         effective_agent = check_name
-                        # Reset orchestrator phase when it starts a new cycle
-                        if check_name == "orchestrator_node":
-                            orchestrator_phase["phase"] = "routing"
-
-                # Detect agent decisions (from structured output) to switch orchestrator phase
-                if (
-                    event_type == "on_chain_end"
-                    and effective_agent == "orchestrator_node"
-                ):
-                    output = event_data.get("output", {})
-                    if isinstance(output, dict):
-                        # Handle OrchestratorDecision (respond or route)
-                        if "action" in output and output.get("action") == "respond":
-                            orchestrator_phase["phase"] = "responding"
-                            # Emit the response content as stream_event (user-facing)
-                            response_content = output.get("response", "")
-                            if response_content:
-                                # Process the response content with token replacements
-                                response_content = response_content.replace(
-                                    "\n", "|new_line|"
-                                )
-                                response_content = response_content.replace(
-                                    " ", "|space|"
-                                )
-                                response_content = response_content.replace(
-                                    "ERPNext", "ERP"
-                                )
-                                response_content = response_content.replace(
-                                    "ERP Next", "ERP"
-                                )
-                                response_content = response_content.replace(
-                                    "ERPNEXT", "ERP"
-                                )
-                                response_content = response_content.replace(
-                                    "erpnext", "ERP"
-                                )
-                                await queue.put(
-                                    {
-                                        "type": "stream_event",
-                                        "agent": effective_agent,
-                                        "content": response_content,
-                                    }
-                                )
-                        elif "action" in output and output.get("action") == "route":
-                            orchestrator_phase["phase"] = "responding"
-                        # Handle legacy next_action format
-                        elif (
-                            "next_action" in output
-                            and output.get("next_action") == "respond"
-                        ):
-                            orchestrator_phase["phase"] = "responding"
 
                 # Detect tool calls
                 if event_type == "on_tool_start":
@@ -196,17 +143,10 @@ async def stream_response_with_ping(
                             text_content = text_content.replace("ERPNEXT", "ERP")
                             text_content = text_content.replace("erpnext", "ERP")
 
-                            # Determine event type based on effective agent and phase
-                            is_reasoning = False
-
+                            # Determine event type based on agent
+                            # Agents in STRUCTURED_OUTPUT_AGENTS produce reasoning
+                            # Others (incl. orchestrator_response_node) produce user content
                             if effective_agent in STRUCTURED_OUTPUT_AGENTS:
-                                # These agents always produce reasoning
-                                is_reasoning = True
-                            elif effective_agent == "orchestrator_node":
-                                # Orchestrator: routing phase = reasoning, responding phase = user content
-                                is_reasoning = orchestrator_phase["phase"] == "routing"
-
-                            if is_reasoning:
                                 await queue.put(
                                     {
                                         "type": "agent_reasoning",

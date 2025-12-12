@@ -1,5 +1,5 @@
 from langchain_core.runnables import RunnableConfig
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from loguru import logger
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
@@ -96,10 +96,6 @@ class OrchestratorDecision(BaseModel):
     action: Literal["respond", "route"] = Field(
         description="respond=answer directly or ask for info, route=delegate to specialist"
     )
-    response: Optional[str] = Field(
-        default=None,
-        description="Required if action=respond. Synthesize information from specialists and generate a clear response.(This is the final response to the user)",
-    )
     target_specialist: Optional[Literal["knowledge", "report", "operations"]] = Field(
         default=None,
         description="Required if action=route. Which specialist to delegate to.",
@@ -107,15 +103,33 @@ class OrchestratorDecision(BaseModel):
     reasoning: str = Field(description="Brief explanation of decision", max_length=200)
 
 
+# Prompt for Phase 2: Streaming response generation
+RESPONSE_PROMPT = """# Aimee - AI Assistant for {company}
+
+You are Aimee, responding to {user_name} ({user_email}).
+
+## Your Task
+Generate a helpful, clear response to the user based on the available information.
+
+## Guidelines
+- Be conversational and professional
+- Synthesize any specialist results into a coherent answer
+- If asking for clarification, be specific about what you need
+- Format responses appropriately (use markdown for lists, tables when helpful)
+
+{context}
+
+Respond naturally to the user's message."""
+
+
 async def orchestrator_node(state: AgentState, config: RunnableConfig):
     """
-    Orchestrator node - decides to respond directly or route to a specialist.
+    Orchestrator Phase 1: Decision Node.
 
-    After each specialist returns, the orchestrator re-evaluates:
-    - If more work is needed, route to another specialist
-    - If ready to answer, synthesize and respond
+    Decides to respond directly or route to a specialist.
+    If responding, routes to orchestrator_response_node for streaming.
     """
-    logger.debug("---ORCHESTRATOR---")
+    logger.debug("---ORCHESTRATOR (Phase 1: Decision)---")
 
     configurable = Configuration.from_runnable_config(config)
     llm = configurable.get_chat_model()
@@ -159,7 +173,7 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
     )
 
     # ========================================
-    # Make decision: respond or route
+    # Phase 1: Make decision (respond or route)
     # ========================================
     try:
         system_message = SystemMessage(
@@ -181,15 +195,10 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
         logger.debug(f"Decision: {decision.action} | reason: {decision.reasoning}")
 
         if decision.action == "respond":
-            response_content = (
-                decision.response
-                or "I'm here to help. Could you tell me more about what you need?"
-            )
+            # Route to Phase 2 for streaming response
             return {
-                "messages": [AIMessage(content=response_content)],
-                "next_action": "respond",
+                "next_action": "respond_streaming",
                 "target_specialist": None,
-                "specialist_results": None,  # Clear results after responding
             }
 
         else:  # route
@@ -202,10 +211,66 @@ async def orchestrator_node(state: AgentState, config: RunnableConfig):
     except Exception as e:
         logger.error(f"Orchestrator error: {e}")
         return {
-            "next_action": "respond",
-            "messages": [
-                AIMessage(
-                    content="I encountered an issue processing your request. Could you please rephrase?"
-                )
-            ],
+            "next_action": "respond_streaming",
+            "target_specialist": None,
         }
+
+
+async def orchestrator_response_node(state: AgentState, config: RunnableConfig):
+    """
+    Orchestrator Phase 2: Streaming Response Node.
+
+    Generates the final response using regular LLM call (not structured output)
+    which enables true token-by-token streaming.
+    """
+    logger.debug("---ORCHESTRATOR (Phase 2: Streaming Response)---")
+
+    configurable = Configuration.from_runnable_config(config)
+    llm = configurable.get_chat_model()
+    messages = state.get("messages", [])
+    specialist_results = state.get("specialist_results", [])
+
+    # Extract user context from RunnableConfig
+    cfg = config.get("configurable", {}) if config else {}
+    company = cfg.get("company", "N/A")
+    user_name = cfg.get("user_name", "User")
+    user_email = cfg.get("user_email", "N/A")
+
+    # Build context for response
+    context_parts = []
+
+    user_context = state.get("user_context")
+    if user_context:
+        context_parts.append(f"## User Knowledge\n{user_context}")
+
+    if specialist_results:
+        results_text = "\n\n".join(
+            [
+                f"**{r.get('specialist', 'unknown').title()} Specialist Result:**\n{r.get('result', '')}"
+                if isinstance(r, dict)
+                else f"**Specialist Result:**\n{r}"
+                for r in specialist_results
+            ]
+        )
+        context_parts.append(f"## Available Information\n{results_text}")
+
+    execution_context = "\n".join(context_parts) if context_parts else ""
+
+    system_message = SystemMessage(
+        content=RESPONSE_PROMPT.format(
+            company=company,
+            user_name=user_name,
+            user_email=user_email,
+            context=execution_context,
+        )
+    )
+
+    # Regular LLM call - enables streaming
+    response = await llm.ainvoke([system_message] + messages)
+
+    return {
+        "messages": [response],
+        "next_action": "respond",
+        "target_specialist": None,
+        "specialist_results": None,  # Clear results after responding
+    }
