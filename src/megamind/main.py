@@ -144,6 +144,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://aimbe.aim.mn",
+        "https://adcommerce.aim.mn",
+        "https://oipartners.aim.mn",
         "https://link.aim.mn",
         "http://localhost:3000",
         "https://localhost:3000",
