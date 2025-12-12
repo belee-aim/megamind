@@ -20,6 +20,7 @@ from megamind.clients.frappe_client import FrappeClient
 from megamind.clients.zep_client import get_zep_client
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.megamind_graph import build_megamind_graph
+from megamind.graph.workflows.subagent_graph import build_subagent_graph
 from megamind.graph.workflows.document_search_graph import build_document_search_graph
 from megamind.graph.workflows.document_extraction_graph import (
     build_document_extraction_graph,
@@ -27,6 +28,7 @@ from megamind.graph.workflows.document_extraction_graph import (
 from megamind.api.v1.minion import router as minion_router
 from megamind.api.v1.document_extraction import router as document_extraction_router
 from megamind.api.v1.zep import router as zep_router
+from megamind.api.v1.subagents import router as subagents_router
 from megamind.models.requests import ChatRequest, RoleGenerationRequest
 from megamind.models.responses import MainResponse
 from megamind.utils.logger import setup_logging
@@ -94,6 +96,10 @@ async def lifespan(app: FastAPI):
         document_extraction_graph = await build_document_extraction_graph()
         logger.info("Document extraction graph built successfully")
 
+        logger.info("Building subagent graph")
+        subagent_graph = await build_subagent_graph(checkpointer=checkpointer)
+        logger.info("Subagent graph built successfully")
+
         # Store in app state
         app.state.pool = pool
         app.state.checkpointer = checkpointer
@@ -102,6 +108,7 @@ async def lifespan(app: FastAPI):
         app.state.document_graph = document_graph
         app.state.document_search_graph = document_search_graph
         app.state.document_extraction_graph = document_extraction_graph
+        app.state.subagent_graph = subagent_graph
         app.state.startup_success = True
 
         logger.info("Application startup completed successfully")
@@ -160,6 +167,7 @@ app.include_router(
     document_extraction_router, prefix="/api/v1", tags=["Document Extraction"]
 )
 app.include_router(zep_router, prefix="/api/v1", tags=["Zep Memory"])
+app.include_router(subagents_router, prefix="/api/v1", tags=["Subagents"])
 
 app.mount("/static", StaticFiles(directory="src/megamind/static"), name="static")
 
