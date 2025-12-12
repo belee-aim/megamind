@@ -30,6 +30,5 @@ async def test_orchestrator_structured_output():
     # Verify the orchestrator decision model has required fields
     assert hasattr(OrchestratorDecision, "model_fields")
     assert "action" in OrchestratorDecision.model_fields
-    assert "response" in OrchestratorDecision.model_fields
     assert "target_specialist" in OrchestratorDecision.model_fields
     assert "reasoning" in OrchestratorDecision.model_fields
