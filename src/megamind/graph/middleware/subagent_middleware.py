@@ -251,7 +251,14 @@ def _create_task_tool(
         subagent, state = _validate_and_prepare_state(
             subagent_type, description, runtime
         )
-        result = subagent.invoke(state)
+
+        try:
+            result = subagent.invoke(state)
+        except Exception as e:
+            # Return the error as a message so the orchestrator can see it
+            # and potentially adjust the task or try a different approach
+            error_msg = f"Subagent '{subagent_type}' encountered an error: {type(e).__name__}: {e}"
+            return error_msg
 
         if not runtime.tool_call_id:
             raise ValueError("Tool call ID is required for subagent invocation")
@@ -271,7 +278,14 @@ def _create_task_tool(
         subagent, state = _validate_and_prepare_state(
             subagent_type, description, runtime
         )
-        result = await subagent.ainvoke(state)
+
+        try:
+            result = await subagent.ainvoke(state)
+        except Exception as e:
+            # Return the error as a message so the orchestrator can see it
+            # and potentially adjust the task or try a different approach
+            error_msg = f"Subagent '{subagent_type}' encountered an error: {type(e).__name__}: {e}"
+            return error_msg
 
         if not runtime.tool_call_id:
             raise ValueError("Tool call ID is required for subagent invocation")

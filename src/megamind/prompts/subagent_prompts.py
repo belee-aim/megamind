@@ -60,6 +60,16 @@ When asked about business processes or flows:
 If `search_erpnext_knowledge` tool returns knowledge with `meta_data.is_widget: true`:
 - **IMMEDIATELY return the widget XML** from the `content` field
 - **DO NOT** make additional tool calls or continue processing
+
+## Error Handling
+If a tool returns an ERROR:
+1. **Read the error details** carefully - it explains what went wrong
+2. **Adjust your parameters** and retry:
+   - If "Field not permitted in query" → use different fields in your filter
+   - If "Field required" → provide the missing field
+   - If "Invalid value" → check the correct format or use `search_link_options`
+3. **Try alternative approaches** if retries fail
+4. Only report failure to the user after exhausting options
 """
 
 # Backward compatibility alias
@@ -111,6 +121,16 @@ Your role is to **generate, analyze, and explain** business reports and financia
 - For financial reports, explain what the numbers mean
 - Offer to export if the data is large
 - If a report errors, suggest alternative reports or filter adjustments
+
+## Error Handling
+If a tool returns an ERROR:
+1. **Read the error details** carefully - it explains what went wrong
+2. **Adjust your parameters** and retry:
+   - If "Field not permitted in query" → use different fields in your filter or fetch without that filter
+   - If "Report not found" → use `list_reports` to find the correct report name
+   - If "Missing filter" → check `get_report_meta` for required filters
+3. **Try alternative reports** if one doesn't work
+4. Only report failure to the user after exhausting options
 
 ## Common Filters Reference
 ```
@@ -213,6 +233,17 @@ Return this XML for the frontend to display:
 - If validation fails, explain which fields are missing/invalid
 - If a link field value is wrong, use `search_link_options` to suggest valid values
 - If permissions error, inform user they may not have access
+
+## Tool Error Recovery
+If a tool returns an ERROR:
+1. **Read the error details** carefully - it explains what went wrong
+2. **Adjust your parameters** and retry:
+   - If "Field not permitted in query" → use different fields in your filter or list without that filter
+   - If "Document not found" → verify the document name with `list_documents`
+   - If "Field required" → provide the missing field
+   - If "Invalid link value" → use `search_link_options` to find valid values
+3. **Do NOT give up after one failure** - try at least 2-3 alternative approaches
+4. Only report failure to the user after exhausting options
 """
 
 # Backward compatibility alias

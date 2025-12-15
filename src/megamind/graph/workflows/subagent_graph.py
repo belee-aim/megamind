@@ -208,20 +208,57 @@ When `search_erpnext_knowledge` returns knowledge with `is_widget: true`:
 
 
 def _wrap_tool_with_context_token(tool: BaseTool) -> BaseTool:
-    """Wrap a tool to inject user_token from request context at runtime."""
+    """Wrap a tool to inject user_token and handle errors gracefully.
+
+    This wrapper:
+    1. Injects the user access token from request context at runtime
+    2. Catches any exceptions and returns them as error messages so the
+       agent can understand what went wrong and adjust its approach
+
+    This enables the agent to see errors like "Field not permitted in query"
+    and retry with different parameters instead of crashing.
+    """
     from megamind.utils.request_context import get_access_token
 
     async def wrapped_coroutine(*args, **kwargs):
         token = get_access_token()
         if token:
             kwargs["user_token"] = token
-        return await tool.coroutine(*args, **kwargs)
+        try:
+            return await tool.coroutine(*args, **kwargs)
+        except Exception as e:
+            # Return error as a string so the agent can see it and adjust
+            error_type = type(e).__name__
+            error_msg = str(e)
+            return (
+                f"ERROR: Tool '{tool.name}' failed with {error_type}.\n"
+                f"Details: {error_msg}\n\n"
+                f"Please adjust your parameters and try again. "
+                f"Common issues:\n"
+                f"- Some fields may not be permitted in queries/filters\n"
+                f"- Required fields may be missing\n"
+                f"- Field names or values may be incorrect"
+            )
 
     def wrapped_func(*args, **kwargs):
         token = get_access_token()
         if token:
             kwargs["user_token"] = token
-        return tool.func(*args, **kwargs)
+        try:
+            return tool.func(*args, **kwargs)
+        except Exception as e:
+            # Return error as a string so the agent can see it and adjust
+            error_type = type(e).__name__
+            error_msg = str(e)
+            return (
+                f"ERROR: Tool '{tool.name}' failed with {error_type}.\n"
+                f"Details: {error_msg}\n\n"
+                f"Please adjust your parameters and try again. "
+                f"Common issues:\n"
+                f"- Some fields may not be permitted in queries/filters\n"
+                f"- Required fields may be missing\n"
+                f"- Field names or values may be incorrect"
+            )
 
     new_tool = tool.copy()
     if tool.coroutine:
