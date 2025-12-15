@@ -189,17 +189,16 @@ You are the ONLY agent that modifies data.
 
 ### After Creating a Document
 Return this XML for the frontend to display:
-```xml
+
 <function>
   <doc_item>
     <doctype>Sales Order</doctype>
     <name>SO-2024-00123</name>
   </doc_item>
 </function>
-```
 
 ### After Listing Documents
-```xml
+
 <function>
   <render_list>
     <title>Recent Sales Orders</title>
@@ -209,7 +208,6 @@ Return this XML for the frontend to display:
     </list>
   </render_list>
 </function>
-```
 
 ### Error Handling
 - If validation fails, explain which fields are missing/invalid
