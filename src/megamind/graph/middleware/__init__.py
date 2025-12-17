@@ -6,6 +6,7 @@ from megamind.graph.middleware.subagent_middleware import (
     TASK_SYSTEM_PROMPT,
     TASK_TOOL_DESCRIPTION,
 )
+from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
 
 __all__ = [
     "SubAgentMiddleware",
@@ -13,4 +14,5 @@ __all__ = [
     "CompiledSubAgent",
     "TASK_SYSTEM_PROMPT",
     "TASK_TOOL_DESCRIPTION",
+    "MCPTokenMiddleware",
 ]

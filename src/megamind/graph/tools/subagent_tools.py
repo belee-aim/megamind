@@ -4,32 +4,61 @@ These are wrapper tools that allow the Orchestrator to call subagents.
 """
 
 from langchain_core.tools import tool
+from langchain.agents.middleware import ToolCallLimitMiddleware
 from loguru import logger
 
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
+from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
 
 
-def inject_token(tool_obj, token):
-    """Wrap a tool to inject user_token into kwargs."""
-    if not token:
-        return tool_obj
+# MCP tool names for report analyst
+REPORT_MCP_TOOL_NAMES = {
+    "run_query_report",
+    "get_report_meta",
+    "get_report_script",
+    "list_reports",
+    "export_report",
+    "get_financial_statements",
+    "run_doctype_report",
+}
 
-    async def wrapped_coroutine(*args, **kwargs):
-        kwargs["user_token"] = token
-        return await tool_obj.coroutine(*args, **kwargs)
-
-    def wrapped_func(*args, **kwargs):
-        kwargs["user_token"] = token
-        return tool_obj.func(*args, **kwargs)
-
-    new_tool = tool_obj.copy()
-    if tool_obj.coroutine:
-        new_tool.coroutine = wrapped_coroutine
-    if tool_obj.func:
-        new_tool.func = wrapped_func
-
-    return new_tool
+# MCP tool names for operations specialist
+OPERATIONS_MCP_TOOL_NAMES = {
+    # Schema/DocType tools
+    "find_doctypes",
+    "get_module_list",
+    "get_doctypes_in_module",
+    "check_doctype_exists",
+    "get_doctype_schema",
+    "get_field_options",
+    "get_field_permissions",
+    "get_naming_info",
+    "get_required_fields",
+    "get_frappe_usage_info",
+    # Document CRUD
+    "create_document",
+    "get_document",
+    "update_document",
+    "delete_document",
+    "list_documents",
+    "check_document_exists",
+    "get_document_count",
+    # Validation
+    "validate_document_enhanced",
+    "get_document_status",
+    # Link field helpers
+    "search_link_options",
+    "get_paginated_options",
+    # Workflow actions
+    "get_workflow_state",
+    "apply_workflow",
+    # System utilities
+    "version",
+    "ping",
+    "call_method",
+    "get_api_instructions",
+}
 
 
 @tool
@@ -122,7 +151,12 @@ async def call_knowledge_analyst(query: str) -> str:
         search_document,
     ]
 
-    agent = create_agent(llm, tools=tools, system_prompt=KNOWLEDGE_ANALYST_PROMPT)
+    agent = create_agent(
+        llm,
+        tools=tools,
+        system_prompt=KNOWLEDGE_ANALYST_PROMPT,
+        middleware=[ToolCallLimitMiddleware(run_limit=10)],
+    )
     response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
 
     return response["messages"][-1].content
@@ -153,20 +187,18 @@ async def call_report_analyst(query: str) -> str:
     mcp_client = client_manager.get_client()
     llm = config.get_chat_model()
 
+    # Get MCP tools (no wrapping - middleware handles token injection)
     all_mcp_tools = await mcp_client.get_tools()
-    target_tool_names = [
-        "run_query_report",
-        "get_report_meta",
-        "get_report_script",
-        "list_reports",
-        "export_report",
-        "get_financial_statements",
-        "run_doctype_report",
-    ]
-    filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
+    filtered_mcp_tools = [t for t in all_mcp_tools if t.name in REPORT_MCP_TOOL_NAMES]
 
     agent = create_agent(
-        llm, tools=filtered_mcp_tools, system_prompt=REPORT_ANALYST_PROMPT
+        llm,
+        tools=filtered_mcp_tools,
+        system_prompt=REPORT_ANALYST_PROMPT,
+        middleware=[
+            MCPTokenMiddleware(mcp_tool_names=REPORT_MCP_TOOL_NAMES),
+            ToolCallLimitMiddleware(run_limit=10),
+        ],
     )
     response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
 
@@ -199,46 +231,20 @@ async def call_operations_specialist(query: str) -> str:
     mcp_client = client_manager.get_client()
     llm = config.get_chat_model()
 
+    # Get MCP tools (no wrapping - middleware handles token injection)
     all_mcp_tools = await mcp_client.get_tools()
-    target_tool_names = [
-        # Schema/DocType tools
-        "find_doctypes",
-        "get_module_list",
-        "get_doctypes_in_module",
-        "check_doctype_exists",
-        "get_doctype_schema",
-        "get_field_options",
-        "get_field_permissions",
-        "get_naming_info",
-        "get_required_fields",
-        "get_frappe_usage_info",
-        # Document CRUD
-        "create_document",
-        "get_document",
-        "update_document",
-        "delete_document",
-        "list_documents",
-        "check_document_exists",
-        "get_document_count",
-        # Validation
-        "validate_document_enhanced",
-        "get_document_status",
-        # Link field helpers
-        "search_link_options",
-        "get_paginated_options",
-        # Workflow actions
-        "get_workflow_state",
-        "apply_workflow",
-        # System utilities
-        "version",
-        "ping",
-        "call_method",
-        "get_api_instructions",
+    filtered_mcp_tools = [
+        t for t in all_mcp_tools if t.name in OPERATIONS_MCP_TOOL_NAMES
     ]
-    filtered_mcp_tools = [t for t in all_mcp_tools if t.name in target_tool_names]
 
     agent = create_agent(
-        llm, tools=filtered_mcp_tools, system_prompt=OPERATIONS_SPECIALIST_PROMPT
+        llm,
+        tools=filtered_mcp_tools,
+        system_prompt=OPERATIONS_SPECIALIST_PROMPT,
+        middleware=[
+            MCPTokenMiddleware(mcp_tool_names=OPERATIONS_MCP_TOOL_NAMES),
+            ToolCallLimitMiddleware(run_limit=15),
+        ],
     )
     response = await agent.ainvoke({"messages": [{"role": "user", "content": query}]})
 

@@ -6,29 +6,20 @@ from langchain.agents.middleware import ToolCallLimitMiddleware
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.states import AgentState
+from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
 from megamind.prompts.subagent_prompts import REPORT_ANALYST_PROMPT
 
 
-def inject_token(tool, token):
-    """Wrap a tool to inject user_token into kwargs."""
-    if not token:
-        return tool
-
-    async def wrapped_coroutine(*args, **kwargs):
-        kwargs["user_token"] = token
-        return await tool.coroutine(*args, **kwargs)
-
-    def wrapped_func(*args, **kwargs):
-        kwargs["user_token"] = token
-        return tool.func(*args, **kwargs)
-
-    new_tool = tool.copy()
-    if tool.coroutine:
-        new_tool.coroutine = wrapped_coroutine
-    if tool.func:
-        new_tool.func = wrapped_func
-
-    return new_tool
+# MCP tool names for report analyst
+REPORT_MCP_TOOL_NAMES = {
+    "run_query_report",
+    "get_report_meta",
+    "get_report_script",
+    "list_reports",
+    "export_report",
+    "get_financial_statements",
+    "run_doctype_report",
+}
 
 
 async def report_analyst(state: AgentState, config: RunnableConfig):
@@ -41,7 +32,6 @@ async def report_analyst(state: AgentState, config: RunnableConfig):
     configurable = Configuration.from_runnable_config(config)
     mcp_client = client_manager.get_client()
     llm = configurable.get_chat_model()
-    access_token = state.get("access_token")
 
     # Get current task from plan
     current_plan = state.get("current_plan")
@@ -50,23 +40,9 @@ async def report_analyst(state: AgentState, config: RunnableConfig):
     if current_plan and plan_step_index < len(current_plan):
         task_context = f"\n\nCurrent Task: {current_plan[plan_step_index]['task']}"
 
+    # Get MCP tools (no wrapping - middleware handles token injection)
     all_mcp_tools = await mcp_client.get_tools()
-    target_tool_names = [
-        "run_query_report",
-        "get_report_meta",
-        "get_report_script",
-        "list_reports",
-        "export_report",
-        "get_financial_statements",
-        "run_doctype_report",
-    ]
-
-    filtered_mcp_tools = []
-    for t in all_mcp_tools:
-        if t.name in target_tool_names:
-            if access_token:
-                t = inject_token(t, access_token)
-            filtered_mcp_tools.append(t)
+    filtered_mcp_tools = [t for t in all_mcp_tools if t.name in REPORT_MCP_TOOL_NAMES]
 
     prompt = REPORT_ANALYST_PROMPT + task_context
     agent = create_agent(
@@ -74,7 +50,8 @@ async def report_analyst(state: AgentState, config: RunnableConfig):
         tools=filtered_mcp_tools,
         system_prompt=prompt,
         middleware=[
-            ToolCallLimitMiddleware(run_limit=10)  # Max 10 tool calls per run
+            MCPTokenMiddleware(mcp_tool_names=REPORT_MCP_TOOL_NAMES),
+            ToolCallLimitMiddleware(run_limit=10),
         ],
     )
 

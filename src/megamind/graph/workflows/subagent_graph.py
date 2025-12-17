@@ -22,6 +22,7 @@ from megamind.graph.middleware.subagent_middleware import (
     CompiledSubAgent,
     SubAgentMiddleware,
 )
+from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
 from megamind.graph.tools.consent_wrapper import wrap_tools_with_consent
 from megamind.graph.tools.minion_tools import search_document
 from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
@@ -207,66 +208,52 @@ When `search_erpnext_knowledge` returns knowledge with `is_widget: true`:
 """
 
 
-def _wrap_tool_with_context_token(tool: BaseTool) -> BaseTool:
-    """Wrap a tool to inject user_token and handle errors gracefully.
+# All MCP tool names that need token injection
+REPORT_MCP_TOOL_NAMES = {
+    "run_query_report",
+    "get_report_meta",
+    "get_report_script",
+    "list_reports",
+    "export_report",
+    "get_financial_statements",
+    "run_doctype_report",
+}
 
-    This wrapper:
-    1. Injects the user access token from request context at runtime
-    2. Catches any exceptions and returns them as error messages so the
-       agent can understand what went wrong and adjust its approach
-
-    This enables the agent to see errors like "Field not permitted in query"
-    and retry with different parameters instead of crashing.
-    """
-    from megamind.utils.request_context import get_access_token
-
-    async def wrapped_coroutine(*args, **kwargs):
-        token = get_access_token()
-        if token:
-            kwargs["user_token"] = token
-        try:
-            return await tool.coroutine(*args, **kwargs)
-        except Exception as e:
-            # Return error as a string so the agent can see it and adjust
-            error_type = type(e).__name__
-            error_msg = str(e)
-            return (
-                f"ERROR: Tool '{tool.name}' failed with {error_type}.\n"
-                f"Details: {error_msg}\n\n"
-                f"Please adjust your parameters and try again. "
-                f"Common issues:\n"
-                f"- Some fields may not be permitted in queries/filters\n"
-                f"- Required fields may be missing\n"
-                f"- Field names or values may be incorrect"
-            )
-
-    def wrapped_func(*args, **kwargs):
-        token = get_access_token()
-        if token:
-            kwargs["user_token"] = token
-        try:
-            return tool.func(*args, **kwargs)
-        except Exception as e:
-            # Return error as a string so the agent can see it and adjust
-            error_type = type(e).__name__
-            error_msg = str(e)
-            return (
-                f"ERROR: Tool '{tool.name}' failed with {error_type}.\n"
-                f"Details: {error_msg}\n\n"
-                f"Please adjust your parameters and try again. "
-                f"Common issues:\n"
-                f"- Some fields may not be permitted in queries/filters\n"
-                f"- Required fields may be missing\n"
-                f"- Field names or values may be incorrect"
-            )
-
-    new_tool = tool.copy()
-    if tool.coroutine:
-        new_tool.coroutine = wrapped_coroutine
-    if tool.func:
-        new_tool.func = wrapped_func
-
-    return new_tool
+OPERATIONS_MCP_TOOL_NAMES = {
+    # Schema/DocType tools
+    "find_doctypes",
+    "get_module_list",
+    "get_doctypes_in_module",
+    "check_doctype_exists",
+    "get_doctype_schema",
+    "get_field_options",
+    "get_field_permissions",
+    "get_naming_info",
+    "get_required_fields",
+    "get_frappe_usage_info",
+    # Document CRUD
+    "create_document",
+    "get_document",
+    "update_document",
+    "delete_document",
+    "list_documents",
+    "check_document_exists",
+    "get_document_count",
+    # Validation
+    "validate_document_enhanced",
+    "get_document_status",
+    # Link field helpers
+    "search_link_options",
+    "get_paginated_options",
+    # Workflow actions
+    "get_workflow_state",
+    "apply_workflow",
+    # System utilities
+    "version",
+    "ping",
+    "call_method",
+    "get_api_instructions",
+}
 
 
 def get_orchestrator_tools() -> list[BaseTool]:
@@ -296,21 +283,8 @@ async def get_report_tools() -> list[BaseTool]:
     mcp_client = client_manager.get_client()
     all_tools = await mcp_client.get_tools()
 
-    target_names = [
-        "run_query_report",
-        "get_report_meta",
-        "get_report_script",
-        "list_reports",
-        "export_report",
-        "get_financial_statements",
-        "run_doctype_report",
-    ]
-
-    filtered = []
-    for t in all_tools:
-        if t.name in target_names:
-            # Wrap to inject token from request context at runtime
-            filtered.append(_wrap_tool_with_context_token(t))
+    # Filter to target tools (no wrapping - middleware handles token injection)
+    filtered = [t for t in all_tools if t.name in REPORT_MCP_TOOL_NAMES]
 
     # Add knowledge search tool for understanding report filters/best practices
     filtered.append(search_erpnext_knowledge)
@@ -323,47 +297,8 @@ async def get_operations_tools() -> list[BaseTool]:
     mcp_client = client_manager.get_client()
     all_tools = await mcp_client.get_tools()
 
-    target_names = [
-        # Schema/DocType tools
-        "find_doctypes",
-        "get_module_list",
-        "get_doctypes_in_module",
-        "check_doctype_exists",
-        "get_doctype_schema",
-        "get_field_options",
-        "get_field_permissions",
-        "get_naming_info",
-        "get_required_fields",
-        "get_frappe_usage_info",
-        # Document CRUD
-        "create_document",
-        "get_document",
-        "update_document",
-        "delete_document",
-        "list_documents",
-        "check_document_exists",
-        "get_document_count",
-        # Validation
-        "validate_document_enhanced",
-        "get_document_status",
-        # Link field helpers
-        "search_link_options",
-        "get_paginated_options",
-        # Workflow actions
-        "get_workflow_state",
-        "apply_workflow",
-        # System utilities
-        "version",
-        "ping",
-        "call_method",
-        "get_api_instructions",
-    ]
-
-    filtered = []
-    for t in all_tools:
-        if t.name in target_names:
-            # Wrap to inject token from request context at runtime
-            filtered.append(_wrap_tool_with_context_token(t))
+    # Filter to target tools (no wrapping - middleware handles token injection)
+    filtered = [t for t in all_tools if t.name in OPERATIONS_MCP_TOOL_NAMES]
 
     # Add knowledge search - MANDATORY before operations per BASE_SYSTEM_PROMPT
     filtered.append(search_erpnext_knowledge)
@@ -411,14 +346,20 @@ async def build_subagent_graph(
         llm,
         tools=await get_report_tools(),
         system_prompt=REPORT_ANALYST_PROMPT,
-        middleware=[ToolCallLimitMiddleware(run_limit=10)],
+        middleware=[
+            MCPTokenMiddleware(mcp_tool_names=REPORT_MCP_TOOL_NAMES),
+            ToolCallLimitMiddleware(run_limit=10),
+        ],
     )
 
     operations_agent = create_agent(
         llm,
         tools=await get_operations_tools(),
         system_prompt=OPERATIONS_SPECIALIST_PROMPT,
-        middleware=[ToolCallLimitMiddleware(run_limit=15)],
+        middleware=[
+            MCPTokenMiddleware(mcp_tool_names=OPERATIONS_MCP_TOOL_NAMES),
+            ToolCallLimitMiddleware(run_limit=15),
+        ],
     )
 
     # Define subagents for complex tasks

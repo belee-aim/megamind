@@ -9,8 +9,52 @@ from megamind.graph.tools.titan_knowledge_tools import (
     search_erpnext_knowledge,
     get_erpnext_knowledge_by_id,
 )
+from megamind.utils.request_context import get_access_token
+from langchain_core.tools import BaseTool
 
 from ..states import AgentState
+
+
+def wrap_mcp_tool_with_context_token(tool: BaseTool) -> BaseTool:
+    """Wrap an MCP tool to inject user_token from FastAPI request context."""
+
+    async def wrapped_coroutine(*args, **kwargs):
+        token = get_access_token()
+        if token:
+            kwargs["user_token"] = token
+        try:
+            return await tool.coroutine(*args, **kwargs)
+        except Exception as e:
+            error_type = type(e).__name__
+            error_msg = str(e)
+            return (
+                f"ERROR: Tool '{tool.name}' failed with {error_type}.\n"
+                f"Details: {error_msg}\n\n"
+                f"Please adjust your parameters and try again."
+            )
+
+    def wrapped_func(*args, **kwargs):
+        token = get_access_token()
+        if token:
+            kwargs["user_token"] = token
+        try:
+            return tool.func(*args, **kwargs)
+        except Exception as e:
+            error_type = type(e).__name__
+            error_msg = str(e)
+            return (
+                f"ERROR: Tool '{tool.name}' failed with {error_type}.\n"
+                f"Details: {error_msg}\n\n"
+                f"Please adjust your parameters and try again."
+            )
+
+    new_tool = tool.copy()
+    if tool.coroutine:
+        new_tool.coroutine = wrapped_coroutine
+    if tool.func:
+        new_tool.func = wrapped_func
+
+    return new_tool
 
 
 def sanitize_messages_for_claude(messages: list) -> list:
@@ -85,7 +129,10 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
     messages = sanitize_messages_for_claude(messages)
 
     llm = configurable.get_chat_model()
-    mcp_tools = await mcp_client.get_tools()
+    raw_mcp_tools = await mcp_client.get_tools()
+
+    # Wrap MCP tools to inject token from request context at runtime
+    mcp_tools = [wrap_mcp_tool_with_context_token(t) for t in raw_mcp_tools]
 
     # Add Titan knowledge search tools
     titan_tools = [search_erpnext_knowledge, get_erpnext_knowledge_by_id]
@@ -94,7 +141,9 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
 
     # Track LLM invocation time
     llm_start = time.time()
-    response = await llm.bind_tools(all_tools, parallel_tool_calls=True).ainvoke(messages)
+    response = await llm.bind_tools(all_tools, parallel_tool_calls=True).ainvoke(
+        messages
+    )
     llm_end = time.time()
 
     # Calculate LLM latency
@@ -102,14 +151,6 @@ async def megamind_agent_node(state: AgentState, config: RunnableConfig):
 
     # Count tool calls in response
     tool_call_count = len(response.tool_calls) if response.tool_calls else 0
-
-    # Add access token to tool call args if present (only for MCP tools)
-    if response.tool_calls:
-        access_token = state.get("access_token")
-        for tool_call in response.tool_calls:
-            tool_name = tool_call.get("name")
-            if any(tool.name == tool_name for tool in mcp_tools):
-                tool_call["args"]["user_token"] = access_token
 
     # Calculate total response time
     response_end = time.time()
