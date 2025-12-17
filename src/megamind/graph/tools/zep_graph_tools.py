@@ -27,8 +27,6 @@ async def search_business_workflows(query: str) -> str:
     Returns:
         Matching workflow and process information.
     """
-    logger.info(f"Tool called: search_business_workflows(query='{query[:50]}...')")
-
     try:
         zep_client = get_zep_client()
 
@@ -78,8 +76,6 @@ async def search_employees(query: str) -> str:
     Returns:
         Matching employee and organizational information.
     """
-    logger.info(f"Tool called: search_employees(query='{query[:50]}...')")
-
     try:
         zep_client = get_zep_client()
 
@@ -94,18 +90,15 @@ async def search_employees(query: str) -> str:
         if not results:
             return f"No employee information found for: {query}"
 
-        # Format results
+        # Format results - Zep returns edges with fact, source_node_name, target_node_name
         formatted_parts = [f"# Employee Search Results ({len(results)} found)\n"]
 
         for i, item in enumerate(results, 1):
-            name = item.get("name", "Unknown")
-            labels = item.get("labels", [])
-            summary = item.get("summary", "")
-            formatted_parts.append(f"## {i}. {name}")
-            if labels:
-                formatted_parts.append(f"**Type**: {', '.join(labels)}")
-            if summary:
-                formatted_parts.append(f"{summary}\n")
+            fact = item.get("fact", "")
+            source = item.get("source_node_name", "")
+            target = item.get("target_node_name", "")
+            formatted_parts.append(f"## {i}. {source} → {target}")
+            formatted_parts.append(f"{fact}\n")
 
         return "\n".join(formatted_parts)
 
@@ -131,10 +124,6 @@ async def search_user_knowledge(query: str, user_email: str) -> str:
     Returns:
         Matching information from the user's personal knowledge graph.
     """
-    logger.info(
-        f"Tool called: search_user_knowledge(query='{query[:50]}...', user={user_email})"
-    )
-
     try:
         zep_client = get_zep_client()
 
