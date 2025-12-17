@@ -365,6 +365,7 @@ Widget queries should use direct tools. If is_widget: true is returned, immediat
 
 # Orchestrator system prompt - focuses on identity, tools overview, and output formats
 # Detailed task routing examples are in TASK_TOOL_DESCRIPTION to avoid duplication
+# Note: User context is injected at runtime via USER_CONTEXT_TEMPLATE as a separate message
 ORCHESTRATOR_PROMPT = """# Aimee - AI Assistant
 
 You are Aimee, an intelligent and proactive assistant specialized in helping with business operations.
@@ -421,6 +422,21 @@ When `search_erpnext_knowledge` returns knowledge with `is_widget: true`:
 </function>
 ```
 """
+
+# Template for user context injected at runtime as a SystemMessage
+# This includes user info, company, datetime, and personalized knowledge
+USER_CONTEXT_TEMPLATE = """## Current Session Context
+
+**User Information:**
+- Name: {user_name}
+- Email: {user_email}
+- Roles: {user_roles}
+- Department: {user_department}
+
+**Company:** {company} (Use this company for all operations unless user specifies otherwise)
+**Current Date/Time:** {current_datetime}
+
+{user_context}"""
 
 
 # Backward compatibility alias

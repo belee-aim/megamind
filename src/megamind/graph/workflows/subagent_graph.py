@@ -217,6 +217,7 @@ async def build_subagent_graph(
     # Build orchestrator with:
     # 1. Direct tools for quick lookups
     # 2. SubAgentMiddleware providing task tool for specialist delegation
+    # Note: User context is injected at runtime via SystemMessage in the API layer
     orchestrator = create_agent(
         llm,
         tools=get_orchestrator_tools(),  # Direct read-only tools
