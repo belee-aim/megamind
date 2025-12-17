@@ -44,7 +44,7 @@ OPERATIONS_MCP_TOOL_NAMES = {
     # System utilities
     "version",
     "ping",
-    "call_method",
+    # "call_method", # Commented because agent keeps using this method for state changing actions.
     "get_api_instructions",
 }
 
