@@ -23,7 +23,7 @@ from megamind.graph.middleware.subagent_middleware import (
     SubAgentMiddleware,
 )
 from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
-from megamind.graph.tools.consent_wrapper import wrap_tools_with_consent
+from megamind.graph.middleware.consent_middleware import ConsentMiddleware
 from megamind.graph.tools.minion_tools import search_document
 from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
 from megamind.graph.tools.zep_graph_tools import (
@@ -303,8 +303,8 @@ async def get_operations_tools() -> list[BaseTool]:
     # Add knowledge search - MANDATORY before operations per BASE_SYSTEM_PROMPT
     filtered.append(search_erpnext_knowledge)
 
-    # Wrap critical tools with consent mechanism
-    return wrap_tools_with_consent(filtered)
+    # Return filtered tools - ConsentMiddleware handles consent in agent middleware
+    return filtered
 
 
 async def build_subagent_graph(
@@ -358,6 +358,7 @@ async def build_subagent_graph(
         system_prompt=OPERATIONS_SPECIALIST_PROMPT,
         middleware=[
             MCPTokenMiddleware(mcp_tool_names=OPERATIONS_MCP_TOOL_NAMES),
+            ConsentMiddleware(),  # Human-in-the-loop for critical operations
             ToolCallLimitMiddleware(run_limit=15),
         ],
     )

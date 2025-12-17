@@ -6,8 +6,8 @@ from langchain.agents.middleware import ToolCallLimitMiddleware
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.states import AgentState
-from megamind.graph.tools.consent_wrapper import wrap_tools_with_consent
 from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
+from megamind.graph.middleware.consent_middleware import ConsentMiddleware
 from megamind.prompts.subagent_prompts import OPERATIONS_SPECIALIST_PROMPT
 
 
@@ -73,14 +73,9 @@ async def operations_specialist(state: AgentState, config: RunnableConfig):
     if current_plan and plan_step_index < len(current_plan):
         task_context = f"\n\nCurrent Task: {current_plan[plan_step_index]['task']}"
 
-    # Get MCP tools (no wrapping - middleware handles token injection)
+    # Get MCP tools (middleware handles token injection and consent)
     all_mcp_tools = await mcp_client.get_tools()
-    filtered_mcp_tools = [
-        t for t in all_mcp_tools if t.name in OPERATIONS_MCP_TOOL_NAMES
-    ]
-
-    # Wrap critical MCP tools with consent mechanism
-    tools = wrap_tools_with_consent(filtered_mcp_tools)
+    tools = [t for t in all_mcp_tools if t.name in OPERATIONS_MCP_TOOL_NAMES]
 
     prompt = OPERATIONS_SPECIALIST_PROMPT + task_context
     agent = create_agent(
@@ -89,6 +84,7 @@ async def operations_specialist(state: AgentState, config: RunnableConfig):
         system_prompt=prompt,
         middleware=[
             MCPTokenMiddleware(mcp_tool_names=OPERATIONS_MCP_TOOL_NAMES),
+            ConsentMiddleware(),  # Human-in-the-loop for critical operations
             ToolCallLimitMiddleware(run_limit=10),
         ],
     )

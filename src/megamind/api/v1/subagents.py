@@ -18,7 +18,7 @@ from megamind.clients.frappe_client import FrappeClient
 from megamind.clients.zep_client import get_zep_client
 from megamind.models.requests import ChatRequest
 from megamind.utils.config import settings
-from megamind.utils.request_context import set_access_token
+from megamind.utils.request_context import set_access_token, set_thread_id
 from megamind.utils.streaming import stream_response_with_ping
 
 
@@ -62,6 +62,9 @@ async def stream_subagent(
 
         # Set access token in request context for tools to read at runtime
         set_access_token(access_token)
+
+        # Set thread_id in request context for ConsentMiddleware Firebase integration
+        set_thread_id(thread)
 
         # Get user context
         frappe_client = FrappeClient(access_token=access_token)
