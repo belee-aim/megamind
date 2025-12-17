@@ -80,20 +80,16 @@ class ConsentMiddleware(AgentMiddleware):
         return any(keyword in tool_name_lower for keyword in self.critical_keywords)
 
     def _build_interrupt_info(self, request: ToolCallRequest) -> dict:
-        """Build the tool call info for the interrupt."""
-        tool_call = request.tool_call
-        tool = None
+        """Build the tool call info for the interrupt.
 
-        # Find the tool to get its description
-        for t in request.all_tools:
-            if t.name == tool_call.get("name"):
-                tool = t
-                break
+        Note: ToolCallRequest only provides tool_call dict, not the tool objects,
+        so we cannot access tool descriptions here.
+        """
+        tool_call = request.tool_call
 
         return {
             "name": tool_call.get("name", ""),
             "args": tool_call.get("args", {}),
-            "description": tool.description if tool else "",
         }
 
     def _process_response(
