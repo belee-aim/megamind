@@ -10,6 +10,7 @@ from langchain.agents.middleware import AgentMiddleware
 from langchain.messages import ToolMessage
 from langchain.tools.tool_node import ToolCallRequest
 from langgraph.types import Command
+from langgraph.errors import GraphInterrupt
 from loguru import logger
 
 from megamind.utils.request_context import get_access_token
@@ -88,6 +89,8 @@ class MCPTokenMiddleware(AgentMiddleware):
 
         try:
             return handler(request)
+        except GraphInterrupt:
+            raise
         except Exception as e:
             result = self._handle_error(tool_name, e)
             result.tool_call_id = request.tool_call.get("id", "")
@@ -111,6 +114,8 @@ class MCPTokenMiddleware(AgentMiddleware):
 
         try:
             return await handler(request)
+        except GraphInterrupt:
+            raise
         except Exception as e:
             result = self._handle_error(tool_name, e)
             result.tool_call_id = request.tool_call.get("id", "")
