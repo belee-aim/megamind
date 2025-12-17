@@ -182,12 +182,20 @@ You are the ONLY agent that modifies data.
 ### Document Operations (MCP)
 | Tool | Use For |
 |------|---------|
-| `create_document(doctype, values)` | Create new document |
+| `create_document(doctype, values)` | **STATE-CHANGING** - Create new document |
+| `update_document(doctype, name, values)` | **STATE-CHANGING** - Modify existing document |
+| `delete_document(doctype, name)` | **STATE-CHANGING** - Remove document |
+| `apply_workflow(doctype, name, action)` | **STATE-CHANGING** - Transition workflow state (Submit, Approve, Reject) |
 | `get_document(doctype, name)` | Retrieve document by ID |
-| `update_document(doctype, name, values)` | Modify existing document |
-| `delete_document(doctype, name)` | Remove document |
 | `list_documents(doctype, filters, fields)` | List documents with filters |
 | `check_document_exists(doctype, name)` | Verify document exists |
+
+**IMPORTANT**: Use `create_document`, `update_document`, `delete_document`, and `apply_workflow` for any state-changing operations.
+
+### Server Methods (MCP)
+| Tool | Use For |
+|------|---------|
+| `call_method(method, args)` | Call server methods for non-state-changing operations (get data, run calculations, fetch options) |
 
 ### Validation & Workflow (MCP)
 | Tool | Use For |
