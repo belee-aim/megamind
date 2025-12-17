@@ -8,6 +8,7 @@ from typing import Any, NotRequired, TypedDict, cast
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import HumanInTheLoopMiddleware, InterruptOnConfig
+from langgraph.errors import GraphInterrupt
 from langchain.agents.middleware.types import (
     AgentMiddleware,
     ModelRequest,
@@ -254,6 +255,10 @@ def _create_task_tool(
 
         try:
             result = subagent.invoke(state)
+        except GraphInterrupt:
+            # Re-raise GraphInterrupt so it propagates to pause the graph
+            # This is critical for human-in-the-loop flows in nested subagents
+            raise
         except Exception as e:
             # Return the error as a message so the orchestrator can see it
             # and potentially adjust the task or try a different approach
@@ -281,6 +286,10 @@ def _create_task_tool(
 
         try:
             result = await subagent.ainvoke(state)
+        except GraphInterrupt:
+            # Re-raise GraphInterrupt so it propagates to pause the graph
+            # This is critical for human-in-the-loop flows in nested subagents
+            raise
         except Exception as e:
             # Return the error as a message so the orchestrator can see it
             # and potentially adjust the task or try a different approach
