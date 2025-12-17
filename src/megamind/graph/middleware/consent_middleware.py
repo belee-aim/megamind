@@ -167,24 +167,24 @@ class ConsentMiddleware(AgentMiddleware):
             await firebase_client.set_interrupt_state(thread_id, True)
             logger.debug(f"Firebase: Set interrupt_state/{thread_id} = True")
 
-        try:
-            # Build interrupt info and wait for user consent
-            tool_call_info = self._build_interrupt_info(request)
-            response = interrupt(tool_call_info)
+        # Build interrupt info and wait for user consent
+        tool_call_info = self._build_interrupt_info(request)
+        response = interrupt(tool_call_info)
 
-            # Process user response
-            should_execute, _ = self._process_response(response, request)
+        # If we reach here, the graph has resumed after the user responded
+        # Clear Firebase interrupt state (user has responded)
+        if thread_id:
+            await firebase_client.set_interrupt_state(thread_id, False)
+            logger.debug(f"Firebase: Set interrupt_state/{thread_id} = False")
 
-            if should_execute:
-                return await handler(request)
+        # Process user response
+        should_execute, _ = self._process_response(response, request)
 
-            # User denied - return cancellation message
-            return ToolMessage(
-                content=f"Action cancelled by user for {tool_name}",
-                tool_call_id=request.tool_call.get("id", ""),
-            )
-        finally:
-            # Clear Firebase interrupt state (user has responded)
-            if thread_id:
-                await firebase_client.set_interrupt_state(thread_id, False)
-                logger.debug(f"Firebase: Set interrupt_state/{thread_id} = False")
+        if should_execute:
+            return await handler(request)
+
+        # User denied - return cancellation message
+        return ToolMessage(
+            content=f"Action cancelled by user for {tool_name}",
+            tool_call_id=request.tool_call.get("id", ""),
+        )
