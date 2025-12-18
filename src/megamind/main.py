@@ -371,7 +371,7 @@ async def get_thread_state(
     Check if a thread is currently interrupted and waiting for user consent.
 
     Returns:
-        - is_interrupted: True if waiting at user_consent_node
+        - is_interrupted: True if middleware has interrupted execution
         - waiting_at_node: Name of the node where execution is paused
         - pending_tool_call: Details of the tool call awaiting consent
         - thread_exists: Whether the thread exists
@@ -379,11 +379,12 @@ async def get_thread_state(
     try:
         logger.info(f"Thread state check called: thread_id={thread_id}")
 
-        graph: CompiledStateGraph = request.app.state.document_graph
+        graph: CompiledStateGraph = request.app.state.subagent_graph
         config = RunnableConfig(configurable={"thread_id": thread_id})
 
-        # Get state snapshot from graph (not checkpointer)
-        state = await graph.aget_state(config)
+        # Get state snapshot from graph including subgraphs
+        # Subgraphs=True is needed because interrupts happen inside subagents (e.g., operations_agent)
+        state = await graph.aget_state(config, subgraphs=True)
 
         # Check if thread exists
         if state is None or state.values is None:
@@ -400,21 +401,65 @@ async def get_thread_state(
                 ).model_dump()
             )
 
-        # Check if interrupted at user_consent_node
-        is_interrupted = "user_consent_node" in (state.next or ())
+        # Check for middleware-based interrupts
+        # Interrupts can be in main graph tasks OR in subgraph tasks (nested)
+        is_interrupted = False
         waiting_at_node = state.next[0] if state.next else None
 
-        # Extract pending tool call if interrupted
+        # Check main graph tasks
+        if state.tasks:
+            for task in state.tasks:
+                if hasattr(task, "interrupts") and task.interrupts:
+                    is_interrupted = True
+                    break
+                # Check subgraph state for nested interrupts
+                if hasattr(task, "state") and task.state:
+                    substate = task.state
+                    if hasattr(substate, "tasks") and substate.tasks:
+                        for subtask in substate.tasks:
+                            if hasattr(subtask, "interrupts") and subtask.interrupts:
+                                is_interrupted = True
+                                break
+                        if is_interrupted:
+                            break
+
+        # Extract pending tool call from interrupt value in tasks
         pending_tool_call = None
-        if is_interrupted and state.values.get("messages"):
-            last_message = state.values["messages"][-1]
-            if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-                tool_call = last_message.tool_calls[0]
-                pending_tool_call = {
-                    "id": tool_call.get("id"),
-                    "name": tool_call.get("name"),
-                    "args": tool_call.get("args"),
-                }
+        if is_interrupted and state.tasks:
+            # Check main graph tasks first, then subgraph tasks
+            for task in state.tasks:
+                # Check main task interrupts
+                if hasattr(task, "interrupts") and task.interrupts:
+                    interrupt_info = task.interrupts[0]
+                    if hasattr(interrupt_info, "value") and interrupt_info.value:
+                        # ConsentMiddleware stores: {"name": ..., "args": ...}
+                        tool_info = interrupt_info.value
+                        pending_tool_call = {
+                            "id": None,  # Middleware doesn't store tool call ID
+                            "name": tool_info.get("name"),
+                            "args": tool_info.get("args"),
+                        }
+                        break
+                # Check subgraph state for nested interrupts
+                if hasattr(task, "state") and task.state:
+                    substate = task.state
+                    if hasattr(substate, "tasks") and substate.tasks:
+                        for subtask in substate.tasks:
+                            if hasattr(subtask, "interrupts") and subtask.interrupts:
+                                interrupt_info = subtask.interrupts[0]
+                                if (
+                                    hasattr(interrupt_info, "value")
+                                    and interrupt_info.value
+                                ):
+                                    tool_info = interrupt_info.value
+                                    pending_tool_call = {
+                                        "id": None,
+                                        "name": tool_info.get("name"),
+                                        "args": tool_info.get("args"),
+                                    }
+                                    break
+                        if pending_tool_call:
+                            break
 
         logger.debug(
             f"Thread {thread_id} state: interrupted={is_interrupted}, node={waiting_at_node}"
