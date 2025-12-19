@@ -19,7 +19,6 @@ from psycopg_pool import AsyncConnectionPool
 from megamind.clients.frappe_client import FrappeClient
 from megamind.clients.zep_client import get_zep_client
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
-from megamind.graph.workflows.megamind_graph import build_megamind_graph
 from megamind.graph.workflows.subagent_graph import build_subagent_graph
 from megamind.graph.workflows.document_search_graph import build_document_search_graph
 from megamind.graph.workflows.document_extraction_graph import (
@@ -82,10 +81,6 @@ async def lifespan(app: FastAPI):
             )
 
         # Build graphs
-        logger.info("Building megamind graph")
-        document_graph = await build_megamind_graph(checkpointer=checkpointer)
-        logger.info("Megamind graph built successfully")
-
         logger.info("Building document search graph")
         document_search_graph = await build_document_search_graph(
             checkpointer=checkpointer
@@ -104,8 +99,6 @@ async def lifespan(app: FastAPI):
         app.state.pool = pool
         app.state.checkpointer = checkpointer
         app.state.zep_client = zep_client
-        app.state.stock_movement_graph = document_graph
-        app.state.document_graph = document_graph
         app.state.document_search_graph = document_search_graph
         app.state.document_extraction_graph = document_extraction_graph
         app.state.subagent_graph = subagent_graph
@@ -221,7 +214,7 @@ async def _handle_chat_stream(
         raise HTTPException(status_code=400, detail="Thread parameter is required")
 
     try:
-        graph: CompiledStateGraph = request.app.state.document_graph
+        graph: CompiledStateGraph = request.app.state.subagent_graph
         config = RunnableConfig(configurable={"thread_id": thread})
 
         access_token = get_token_from_header(request)

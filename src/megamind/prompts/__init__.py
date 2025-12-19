@@ -27,11 +27,6 @@ from megamind.prompts.document_extraction import (
     value_inference_agent_instructions,
 )
 
-# Import from corrective_rag module
-from megamind.prompts.corrective_rag import (
-    corrective_query_generation_instructions,
-)
-
 # Import from knowledge_capture module
 from megamind.prompts.knowledge_capture import (
     knowledge_extraction_agent_instructions,
@@ -47,8 +42,6 @@ __all__ = [
     # Document extraction
     "fact_extraction_agent_instructions",
     "value_inference_agent_instructions",
-    # Corrective RAG
-    "corrective_query_generation_instructions",
     # Knowledge capture
     "knowledge_extraction_agent_instructions",
 ]

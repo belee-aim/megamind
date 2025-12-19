@@ -63,17 +63,13 @@ async def stream_response_with_ping(
 
     # All known agent nodes in the graph
     KNOWN_AGENTS = {
-        "orchestrator_node",
-        "orchestrator_response_node",  # Phase 2: streams user-facing response
         "knowledge_analyst",
         "report_analyst",
         "operations_specialist",
     }
 
-    # Agents that ALWAYS use structured output - their streaming is "reasoning"
-    # orchestrator_response_node is NOT here because it streams user content
+    # Agents that use structured output - their streaming is "reasoning"
     STRUCTURED_OUTPUT_AGENTS = {
-        "orchestrator_node",  # Phase 1 decision uses structured output
         "knowledge_analyst",
         "report_analyst",
         "operations_specialist",
