@@ -69,13 +69,6 @@ async def stream_response_with_ping(
         "operations",
     }
 
-    # Agents that use structured output - their streaming is "reasoning"
-    STRUCTURED_OUTPUT_AGENTS = {
-        "knowledge",
-        "report",
-        "operations",
-    }
-
     async def stream_producer():
         try:
             current_agent = None
@@ -140,27 +133,20 @@ async def stream_response_with_ping(
                             text_content = text_content.replace("ERPNEXT", "ERP")
                             text_content = text_content.replace("erpnext", "ERP")
 
-                            # Determine event type based on agent
-                            # Agents in STRUCTURED_OUTPUT_AGENTS produce reasoning
-                            # Others (incl. orchestrator) produce user content
-                            # Main orchestrator agent should have agent=None
-                            if effective_agent in STRUCTURED_OUTPUT_AGENTS:
-                                await queue.put(
-                                    {
-                                        "type": "agent_reasoning",
-                                        "agent": effective_agent,
-                                        "content": text_content,
-                                    }
-                                )
-                            else:
-                                # Main orchestrator - set agent to None
-                                await queue.put(
-                                    {
-                                        "type": "stream_event",
-                                        "agent": None,
-                                        "content": text_content,
-                                    }
-                                )
+                            # Emit stream_event for all content
+                            # Subagents include their name, main orchestrator has agent=None
+                            agent_name = (
+                                effective_agent
+                                if effective_agent in KNOWN_AGENTS
+                                else None
+                            )
+                            await queue.put(
+                                {
+                                    "type": "stream_event",
+                                    "agent": agent_name,
+                                    "content": text_content,
+                                }
+                            )
 
         except Exception as e:
             logger.error(f"Error in stream producer: {e}")
