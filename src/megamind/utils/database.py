@@ -32,6 +32,9 @@ async def configure_connection(conn: AsyncConnection) -> None:
         # This prevents runaway queries from blocking connections
         await conn.execute("SET statement_timeout = 60000")
 
+        # Commit to exit the implicit transaction started by SET commands
+        await conn.commit()
+
         logger.debug("Database connection configured successfully")
     except Exception as e:
         logger.error(f"Failed to configure database connection: {e}")

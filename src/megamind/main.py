@@ -17,6 +17,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
 from megamind.clients.frappe_client import FrappeClient
+from megamind.utils.database import check_connection, configure_connection
 from megamind.clients.zep_client import get_zep_client
 from megamind.graph.nodes.integrations.reconciliation_model import merge_customer_data
 from megamind.graph.workflows.subagent_graph import build_subagent_graph
@@ -59,6 +60,8 @@ async def lifespan(app: FastAPI):
         reconnect_timeout=settings.db_pool_reconnect_timeout,
         timeout=settings.db_pool_timeout,
         num_workers=settings.db_pool_num_workers,
+        configure=configure_connection,
+        check=check_connection,
         open=False,
     )
 

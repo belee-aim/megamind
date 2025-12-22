@@ -24,11 +24,21 @@ from megamind.graph.middleware.subagent_middleware import (
 )
 from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
 from megamind.graph.middleware.consent_middleware import ConsentMiddleware
-from megamind.graph.tools.minion_tools import search_document
+from megamind.graph.tools.minion_tools import (
+    aggregate_data,
+    ask_knowledge_graph,
+    get_document_chain,
+    get_document_context,
+    get_entity_context,
+    get_related_documents,
+    get_user_context,
+    graph_search,
+    search_document,
+    semantic_search,
+)
 from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
 from megamind.graph.tools.zep_graph_tools import (
     search_business_workflows,
-    search_employees,
     search_user_knowledge,
 )
 from megamind.prompts.subagent_prompts import (
@@ -91,22 +101,36 @@ OPERATIONS_MCP_TOOL_NAMES = {
 def get_orchestrator_tools() -> list[BaseTool]:
     """Get direct tools for the orchestrator (read-only, quick lookups)."""
     return [
+        # Zep knowledge graph tools
         search_business_workflows,
-        search_employees,
         search_user_knowledge,
+        # Titan ERPNext knowledge
         search_erpnext_knowledge,
+        # Minion tools (quick lookups)
         search_document,
+        semantic_search,
+        graph_search,
     ]
 
 
 def get_knowledge_tools() -> list[BaseTool]:
-    """Get tools for the knowledge specialist."""
+    """Get tools for the knowledge specialist (deep research)."""
     return [
+        # Zep knowledge graph tools
         search_business_workflows,
-        search_employees,
         search_user_knowledge,
+        # Titan ERPNext knowledge
         search_erpnext_knowledge,
+        # Minion tools (full suite for deep research)
         search_document,
+        semantic_search,
+        graph_search,
+        ask_knowledge_graph,
+        get_document_chain,
+        get_related_documents,
+        get_document_context,
+        get_user_context,
+        get_entity_context,
     ]
 
 
@@ -121,6 +145,9 @@ async def get_report_tools() -> list[BaseTool]:
     # Add knowledge search tool for understanding report filters/best practices
     filtered.append(search_erpnext_knowledge)
 
+    # Add minion aggregate tool for BI analytics
+    filtered.append(aggregate_data)
+
     return filtered
 
 
@@ -134,6 +161,10 @@ async def get_operations_tools() -> list[BaseTool]:
 
     # Add knowledge search - MANDATORY before operations per BASE_SYSTEM_PROMPT
     filtered.append(search_erpnext_knowledge)
+
+    # Add minion context tools for checking before modifying
+    filtered.append(get_document_context)
+    filtered.append(get_user_context)
 
     # Return filtered tools - ConsentMiddleware handles consent in agent middleware
     return filtered

@@ -10,6 +10,7 @@ from loguru import logger
 from megamind.clients.mcp_client_manager import client_manager
 from megamind.configuration import Configuration
 from megamind.graph.middleware.mcp_token_middleware import MCPTokenMiddleware
+from megamind.graph.tools.minion_tools import graph_search, semantic_search
 
 
 # MCP tool names for report analyst
@@ -149,6 +150,9 @@ async def call_knowledge_analyst(query: str) -> str:
         search_employees,
         search_erpnext_knowledge,
         search_document,
+        # Minion graph search (quick lookups)
+        semantic_search,
+        graph_search,
     ]
 
     agent = create_agent(
