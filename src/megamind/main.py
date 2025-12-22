@@ -489,6 +489,11 @@ async def get_thread_history(
     """
     Retrieve conversation history for a thread from PostgreSQL checkpointer.
     Returns all messages in chronological order.
+
+    Subagent responses are identified by correlating ToolMessage entries with
+    their corresponding "task" tool calls. These will have:
+    - is_subagent_response: true
+    - subagent_type: the type of subagent that generated the response
     """
     try:
         logger.debug(f"Retrieving history for thread: {thread_id}")
@@ -505,6 +510,22 @@ async def get_thread_history(
 
         # Extract messages from state
         messages = thread_state.get("channel_values", {}).get("messages", [])
+
+        # Build a lookup of task tool calls (subagent invocations) by tool_call_id
+        # This allows us to identify which ToolMessages are subagent responses
+        task_tool_calls: dict[str, dict] = {}
+        for msg in messages:
+            if (
+                isinstance(msg, AIMessage)
+                and hasattr(msg, "tool_calls")
+                and msg.tool_calls
+            ):
+                for tc in msg.tool_calls:
+                    if tc.get("name") == "task":
+                        task_tool_calls[tc.get("id")] = {
+                            "subagent_type": tc.get("args", {}).get("subagent_type"),
+                            "description": tc.get("args", {}).get("description"),
+                        }
 
         # Convert messages to serializable format
         history = []
@@ -546,14 +567,25 @@ async def get_thread_history(
                     }
                 )
             elif isinstance(msg, ToolMessage):
-                history.append(
-                    {
-                        "role": "tool",
-                        "content": msg.content,
-                        "type": "tool",
-                        "tool_call_id": msg.tool_call_id,
-                    }
-                )
+                # Check if this ToolMessage is a response from a subagent
+                tool_call_id = msg.tool_call_id
+                is_subagent = tool_call_id in task_tool_calls
+
+                tool_msg_data = {
+                    "role": "tool",
+                    "content": msg.content,
+                    "type": "tool",
+                    "tool_call_id": tool_call_id,
+                    "is_subagent_response": is_subagent,
+                }
+
+                # Add subagent-specific metadata if this is a subagent response
+                if is_subagent:
+                    subagent_info = task_tool_calls[tool_call_id]
+                    tool_msg_data["subagent_type"] = subagent_info.get("subagent_type")
+                    tool_msg_data["subagent_task"] = subagent_info.get("description")
+
+                history.append(tool_msg_data)
 
         logger.info(f"Retrieved {len(history)} messages for thread {thread_id}")
 
