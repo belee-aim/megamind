@@ -131,7 +131,7 @@ async def call_knowledge_analyst(query: str) -> str:
         The specialist's response.
     """
     from langchain.agents import create_agent
-    from megamind.graph.tools.zep_graph_tools import (
+    from megamind.graph.tools.minion_workflow_tools import (
         search_business_workflows,
         search_employees,
     )
