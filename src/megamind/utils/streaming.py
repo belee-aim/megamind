@@ -62,17 +62,18 @@ async def stream_response_with_ping(
     ai_response_content = []
 
     # All known agent nodes in the graph
+    # These names match the subagent "name" field in subagent_graph.py
     KNOWN_AGENTS = {
-        "knowledge_analyst",
-        "report_analyst",
-        "operations_specialist",
+        "knowledge",
+        "report",
+        "operations",
     }
 
     # Agents that use structured output - their streaming is "reasoning"
     STRUCTURED_OUTPUT_AGENTS = {
-        "knowledge_analyst",
-        "report_analyst",
-        "operations_specialist",
+        "knowledge",
+        "report",
+        "operations",
     }
 
     async def stream_producer():
@@ -141,7 +142,8 @@ async def stream_response_with_ping(
 
                             # Determine event type based on agent
                             # Agents in STRUCTURED_OUTPUT_AGENTS produce reasoning
-                            # Others (incl. orchestrator_response_node) produce user content
+                            # Others (incl. orchestrator) produce user content
+                            # Main orchestrator agent should have agent=None
                             if effective_agent in STRUCTURED_OUTPUT_AGENTS:
                                 await queue.put(
                                     {
@@ -151,10 +153,11 @@ async def stream_response_with_ping(
                                     }
                                 )
                             else:
+                                # Main orchestrator - set agent to None
                                 await queue.put(
                                     {
                                         "type": "stream_event",
-                                        "agent": effective_agent,
+                                        "agent": None,
                                         "content": text_content,
                                     }
                                 )
