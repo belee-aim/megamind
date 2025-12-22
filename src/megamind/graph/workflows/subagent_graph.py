@@ -37,10 +37,14 @@ from megamind.graph.tools.minion_tools import (
     semantic_search,
 )
 from megamind.graph.tools.titan_knowledge_tools import search_erpnext_knowledge
-from megamind.graph.tools.zep_graph_tools import (
+from megamind.graph.tools.minion_workflow_tools import (
     search_business_workflows,
-    search_user_knowledge,
+    search_workflow_knowledge,
+    ask_workflow_question,
+    get_workflow_related_objects,
+    search_employees,
 )
+from megamind.graph.tools.zep_graph_tools import search_user_knowledge  # Keep for now
 from megamind.prompts.subagent_prompts import (
     KNOWLEDGE_ANALYST_PROMPT,
     OPERATIONS_SPECIALIST_PROMPT,
@@ -101,8 +105,10 @@ OPERATIONS_MCP_TOOL_NAMES = {
 def get_orchestrator_tools() -> list[BaseTool]:
     """Get direct tools for the orchestrator (read-only, quick lookups)."""
     return [
-        # Zep knowledge graph tools
+        # Minion workflow tools
         search_business_workflows,
+        search_employees,
+        # Zep user knowledge (keep for now)
         search_user_knowledge,
         # Titan ERPNext knowledge
         search_erpnext_knowledge,
@@ -116,8 +122,13 @@ def get_orchestrator_tools() -> list[BaseTool]:
 def get_knowledge_tools() -> list[BaseTool]:
     """Get tools for the knowledge specialist (deep research)."""
     return [
-        # Zep knowledge graph tools
+        # Minion workflow tools (full suite for deep research)
         search_business_workflows,
+        search_workflow_knowledge,
+        ask_workflow_question,
+        get_workflow_related_objects,
+        search_employees,
+        # Zep user knowledge (keep for now)
         search_user_knowledge,
         # Titan ERPNext knowledge
         search_erpnext_knowledge,
