@@ -40,6 +40,9 @@ async def stream_response_with_ping(
     """
     Streams responses from the graph with agent status visibility.
 
+    Uses tags from metadata for reliable subagent identification.
+    Tags are set by SubAgentMiddleware when invoking subagents.
+
     Events:
     - agent_reasoning: Agent's internal reasoning/planning content
     - agent_tool_call: When agent calls a tool
@@ -61,53 +64,55 @@ async def stream_response_with_ping(
     # Collect AI response content for Zep sync
     ai_response_content = []
 
-    # All known agent nodes in the graph
-    # These names match the subagent "name" field in subagent_graph.py
-    KNOWN_AGENTS = {
+    # Known subagent types for tag-based identification
+    # These names match the subagent "name" field in SubAgentMiddleware
+    SUBAGENT_TYPES = {
         "knowledge",
         "report",
         "operations",
     }
 
+    def get_agent_from_metadata(metadata: dict) -> str | None:
+        """Extract subagent type from metadata tags.
+
+        Tags are the most reliable way to identify subagents since they're
+        explicitly set when invoking subagents via SubAgentMiddleware.
+        Falls back to langgraph_node if no matching tag is found.
+
+        Args:
+            metadata: Event metadata containing tags and langgraph_node
+
+        Returns:
+            Subagent name if found in tags or langgraph_node, None otherwise
+        """
+        # Priority 1: Check tags (most reliable, explicitly set by middleware)
+        tags = metadata.get("tags", [])
+        for tag in tags:
+            if tag in SUBAGENT_TYPES:
+                return tag
+
+        # Priority 2: Check langgraph_node (fallback for graph nodes)
+        langgraph_node = metadata.get("langgraph_node", "")
+        if langgraph_node in SUBAGENT_TYPES:
+            return langgraph_node
+
+        return None
+
     async def stream_producer():
         try:
-            current_agent = None
-
             async for event in graph.astream_events(inputs, config, version="v2"):
                 event_type = event.get("event")
                 event_name = event.get("name", "")
                 event_data = event.get("data", {})
                 metadata = event.get("metadata", {})
 
-                # Get langgraph_node from metadata - this is the parent graph node
-                # even when we're inside nested chains/agents
-                langgraph_node = metadata.get("langgraph_node", "")
-
-                # Determine effective agent for this event:
-                # 1. If langgraph_node is a known agent, use it (most accurate)
-                # 2. Otherwise fall back to the tracked current_agent
-                effective_agent = current_agent
-                if langgraph_node in KNOWN_AGENTS:
-                    effective_agent = langgraph_node
-
-                # Track current agent from node starts - only update for known agent nodes
-                # This prevents internal chain names like "model" or "tools" from overwriting
-                if event_type == "on_chain_start":
-                    check_name = langgraph_node or event_name
-                    if check_name in KNOWN_AGENTS:
-                        current_agent = check_name
-                        effective_agent = check_name
+                # Get agent from metadata (tags first, then langgraph_node)
+                effective_agent = get_agent_from_metadata(metadata)
 
                 # Detect tool calls
                 if event_type == "on_tool_start":
                     tool_name = event_name
                     tool_input = event_data.get("input", {})
-
-                    # Update current agent if this is a subagent delegation
-                    if tool_name == "task" and isinstance(tool_input, dict):
-                        subagent = tool_input.get("subagent_type", "")
-                        if subagent:
-                            current_agent = subagent
 
                     await queue.put(
                         {
@@ -134,16 +139,11 @@ async def stream_response_with_ping(
                             text_content = text_content.replace("erpnext", "ERP")
 
                             # Emit stream_event for all content
-                            # Subagents include their name, main orchestrator has agent=None
-                            agent_name = (
-                                effective_agent
-                                if effective_agent in KNOWN_AGENTS
-                                else None
-                            )
+                            # Subagents include their name, orchestrator has agent=None
                             await queue.put(
                                 {
                                     "type": "stream_event",
-                                    "agent": agent_name,
+                                    "agent": effective_agent,
                                     "content": text_content,
                                 }
                             )

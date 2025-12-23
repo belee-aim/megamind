@@ -285,7 +285,7 @@ def _create_task_tool(
         )
 
         try:
-            result = await subagent.ainvoke(state)
+            result = await subagent.ainvoke(state, config={"tags": [subagent_type]})
         except GraphInterrupt:
             # Re-raise GraphInterrupt so it propagates to pause the graph
             # This is critical for human-in-the-loop flows in nested subagents
