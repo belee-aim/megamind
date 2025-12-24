@@ -68,8 +68,13 @@ class CompiledSubAgent(TypedDict):
     """The compiled agent Runnable."""
 
 
-# State keys excluded when passing state to subagents
-_EXCLUDED_STATE_KEYS = ("messages", "todos")
+# State keys that are excluded when passing state to subagents and when returning
+# updates from subagents.
+# When returning updates:
+# 1. The messages key is handled explicitly to ensure only the final message is included
+# 2. The todos and structured_response keys are excluded as they do not have a defined reducer
+#    and no clear meaning for returning them from a subagent to the main agent.
+_EXCLUDED_STATE_KEYS = {"messages", "todos", "structured_response"}
 
 # ERP-specific task tool description
 TASK_TOOL_DESCRIPTION = """Launch a specialist subagent to handle specific tasks.
@@ -209,12 +214,14 @@ def _create_task_tool(
         state_update = {
             k: v for k, v in result.items() if k not in _EXCLUDED_STATE_KEYS
         }
+        # Strip trailing whitespace to prevent API errors with Anthropic
+        message_text = (
+            result["messages"][-1].text.rstrip() if result["messages"][-1].text else ""
+        )
         return Command(
             update={
                 **state_update,
-                "messages": [
-                    ToolMessage(result["messages"][-1].text, tool_call_id=tool_call_id)
-                ],
+                "messages": [ToolMessage(message_text, tool_call_id=tool_call_id)],
             }
         )
 
@@ -254,7 +261,7 @@ def _create_task_tool(
         )
 
         try:
-            result = subagent.invoke(state)
+            result = subagent.invoke(state, runtime.config)
         except GraphInterrupt:
             # Re-raise GraphInterrupt so it propagates to pause the graph
             # This is critical for human-in-the-loop flows in nested subagents
