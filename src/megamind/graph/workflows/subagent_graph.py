@@ -1,10 +1,12 @@
 """Megamind graph using SubAgentMiddleware pattern.
 
-This replaces the traditional LangGraph orchestrator-worker pattern with
-a middleware-based approach where specialists are invoked via a `task` tool.
+The orchestrator delegates ALL work to specialist subagents via the `task` tool:
+- knowledge: The SOLE GATEWAY for all knowledge queries (workflows, employees, docs)
+- report: Report generation and financial analytics
+- operations: Document CRUD and workflow actions (the only agent that modifies data)
 
-The orchestrator has direct access to read-only tools for quick lookups,
-plus can delegate to specialists for complex multi-step operations.
+The orchestrator has NO direct tools - it uses the knowledge subagent first,
+then delegates to other specialists with context from knowledge.
 """
 
 from typing import Optional
@@ -88,19 +90,22 @@ OPERATIONS_MCP_TOOL_NAMES = {
 }
 
 
-def get_orchestrator_tools() -> list[BaseTool]:
-    """Get direct tools for the orchestrator (read-only, quick lookups)."""
-    return [
-        search_business_workflows,
-        search_employees,
-        search_user_knowledge,
-        search_erpnext_knowledge,
-        search_document,
-    ]
+# Note: Orchestrator has NO direct tools - uses task tool to delegate to knowledge subagent
+# This ensures knowledge subagent is the sole gateway for all knowledge queries
 
 
 def get_knowledge_tools() -> list[BaseTool]:
-    """Get tools for the knowledge specialist."""
+    """Get tools for the knowledge specialist.
+
+    The knowledge subagent is the SOLE GATEWAY for all knowledge queries:
+    - Business workflows: Company processes, approval chains, SOPs
+    - Employees: Org structure, departments, roles, reporting relationships
+    - User knowledge: Personal context, preferences, past interactions
+    - ERPNext knowledge: DocType schemas, field rules, best practices, documentation
+    - Documents: Files in the Document Management System (DMS)
+
+    The orchestrator delegates ALL knowledge lookups to this subagent.
+    """
     return [
         search_business_workflows,
         search_employees,
@@ -111,32 +116,38 @@ def get_knowledge_tools() -> list[BaseTool]:
 
 
 async def get_report_tools() -> list[BaseTool]:
-    """Get MCP tools for the report specialist."""
+    """Get MCP tools for the report specialist.
+
+    Report subagent focuses ONLY on report execution:
+    - Query/script reports, financial statements, doctype reports
+    - Export functionality
+
+    Knowledge context (report filters, best practices) should be provided
+    in the task description by the orchestrator after consulting knowledge subagent.
+    """
     mcp_client = client_manager.get_client()
     all_tools = await mcp_client.get_tools()
 
-    # Filter to target tools (no wrapping - middleware handles token injection)
-    filtered = [t for t in all_tools if t.name in REPORT_MCP_TOOL_NAMES]
-
-    # Add knowledge search tool for understanding report filters/best practices
-    filtered.append(search_erpnext_knowledge)
-
-    return filtered
+    # Filter to report tools only - no knowledge tools
+    return [t for t in all_tools if t.name in REPORT_MCP_TOOL_NAMES]
 
 
 async def get_operations_tools() -> list[BaseTool]:
-    """Get MCP tools for the operations specialist with consent wrapper."""
+    """Get MCP tools for the operations specialist.
+
+    Operations subagent focuses ONLY on document operations:
+    - CRUD: create, read, update, delete documents
+    - Workflow: apply workflow actions (submit, approve, reject)
+    - Schema: get doctype info, required fields, field options
+
+    Required field validation and best practices should be provided
+    in the task description by the orchestrator after consulting knowledge subagent.
+    """
     mcp_client = client_manager.get_client()
     all_tools = await mcp_client.get_tools()
 
-    # Filter to target tools (no wrapping - middleware handles token injection)
-    filtered = [t for t in all_tools if t.name in OPERATIONS_MCP_TOOL_NAMES]
-
-    # Add knowledge search - MANDATORY before operations per BASE_SYSTEM_PROMPT
-    filtered.append(search_erpnext_knowledge)
-
-    # Return filtered tools - ConsentMiddleware handles consent in agent middleware
-    return filtered
+    # Filter to operations tools only - no knowledge tools
+    return [t for t in all_tools if t.name in OPERATIONS_MCP_TOOL_NAMES]
 
 
 async def build_subagent_graph(
@@ -144,9 +155,11 @@ async def build_subagent_graph(
 ) -> CompiledStateGraph:
     """Build megamind using subagent middleware pattern.
 
-    The orchestrator has:
-    1. Direct access to read-only tools for quick lookups
-    2. A `task` tool for delegating to specialists for complex operations
+    Architecture:
+    - Orchestrator has NO direct tools
+    - Uses `task` tool to delegate to specialist subagents
+    - Knowledge subagent is the sole gateway for all knowledge queries
+    - Report and Operations subagents focus on their core MCP tools
 
     MCP tools get the access token from request context at runtime via
     set_access_token() called before invoking the graph.
@@ -196,31 +209,48 @@ async def build_subagent_graph(
     )
 
     # Define subagents for complex tasks
+    # NOTE: Knowledge subagent is the SOLE GATEWAY for all knowledge - orchestrator has no direct tools
     subagents: list[CompiledSubAgent] = [
         {
             "name": "knowledge",
-            "description": "Deep research on business processes, workflows, documentation (Through Knowledge Graph and Vector Search). Use for complex multi-step knowledge gathering.",
+            "description": (
+                "SOLE GATEWAY for all organizational knowledge. Use this subagent FIRST for:\n"
+                "- Business workflows, approval processes, SOPs\n"
+                "- Employee info, org structure, departments, roles\n"
+                "- User preferences and past context\n"
+                "- ERPNext documentation, DocType schemas, field validation rules\n"
+                "- Finding documents in DMS\n\n"
+                "ALWAYS consult knowledge BEFORE operations (to get required fields) or reports (to get filter requirements)."
+            ),
             "runnable": knowledge_agent,
         },
         {
             "name": "report",
-            "description": "Generate and analyze ERPNext reports, financial data, analytics. Use for complex report queries.",
+            "description": (
+                "Generate and analyze system reports, financial statements, and analytics.\n"
+                "Has access to: run_query_report, get_report_meta, list_reports, get_financial_statements, export_report.\n\n"
+                "NOTE: Does NOT have knowledge search. Provide relevant context (filters, best practices) from knowledge in the task description."
+            ),
             "runnable": report_agent,
         },
         {
             "name": "operations",
-            "description": "Apply Workflow on a ERPNext Doctype or Create/Read/Update/Delete Doctypes on ERPNext. ONLY agent that can modify data.",
+            "description": (
+                "Execute document operations and workflow actions. The ONLY agent that can modify data.\n"
+                "Has access to: create/get/update/delete_document, apply_workflow, get_doctype_schema, get_required_fields, list_documents.\n\n"
+                "NOTE: Does NOT have knowledge search. Provide required fields and validation rules from knowledge in the task description."
+            ),
             "runnable": operations_agent,
         },
     ]
 
     # Build orchestrator with:
-    # 1. Direct tools for quick lookups
-    # 2. SubAgentMiddleware providing task tool for specialist delegation
+    # - NO direct tools - all knowledge queries go through knowledge subagent
+    # - SubAgentMiddleware provides the `task` tool for specialist delegation
     # Note: User context is injected at runtime via SystemMessage in the API layer
     orchestrator = create_agent(
         llm,
-        tools=get_orchestrator_tools(),  # Direct read-only tools
+        tools=[],  # No direct tools - delegates everything via task tool
         system_prompt=ORCHESTRATOR_PROMPT,
         middleware=[
             TodoListMiddleware(),  # Task planning
@@ -229,11 +259,14 @@ async def build_subagent_graph(
                 subagents=subagents,
                 general_purpose_agent=False,
                 task_description=TASK_TOOL_DESCRIPTION,
+                system_prompt=None,  # ORCHESTRATOR_PROMPT already has complete instructions
             ),
             ToolCallLimitMiddleware(run_limit=30),
         ],
         checkpointer=checkpointer,
     )
 
-    logger.info("Subagent graph built successfully with direct tools + specialists")
+    logger.info(
+        "Subagent graph built: orchestrator delegates via task tool to knowledge/report/operations"
+    )
     return orchestrator
