@@ -72,7 +72,7 @@ async def stream_response_with_ping(
         "operations",
     }
 
-    def get_agent_from_metadata(metadata: dict) -> str | None:
+    def get_agent_from_metadata(metadata: dict) -> str:
         """Extract subagent type from metadata tags.
 
         Tags are the most reliable way to identify subagents since they're
@@ -83,7 +83,7 @@ async def stream_response_with_ping(
             metadata: Event metadata containing tags and langgraph_node
 
         Returns:
-            Subagent name if found in tags or langgraph_node, None otherwise
+            Subagent name if found in tags or langgraph_node, "orchestrator" otherwise
         """
         # Priority 1: Check tags (most reliable, explicitly set by middleware)
         tags = metadata.get("tags", [])
@@ -96,57 +96,115 @@ async def stream_response_with_ping(
         if langgraph_node in SUBAGENT_TYPES:
             return langgraph_node
 
-        return None
+        return "orchestrator"
 
     async def stream_producer():
         try:
-            async for event in graph.astream_events(inputs, config, version="v2"):
-                event_type = event.get("event")
-                event_name = event.get("name", "")
-                event_data = event.get("data", {})
-                metadata = event.get("metadata", {})
+            # Use messages + custom stream mode for subagent tool visibility
+            # subgraphs=True enables real-time streaming from subagents
+            async for chunk in graph.astream(
+                inputs,
+                config=config,
+                stream_mode=["messages", "custom"],
+                subgraphs=True,
+            ):
+                # With subgraphs=True, chunks come as:
+                # (namespace_tuple, stream_mode, data)
+                # where namespace_tuple identifies the subgraph path
+                # e.g., () for root, ('task:abc123',) for subagent
 
-                # Get agent from metadata (tags first, then langgraph_node)
+                namespace = ()
+                stream_mode = None
+                data = None
+
+                if isinstance(chunk, tuple):
+                    if len(chunk) == 3:
+                        # subgraphs=True format: (namespace, stream_mode, data)
+                        namespace, stream_mode, data = chunk
+                    elif len(chunk) == 2:
+                        # Regular format: (stream_mode, data)
+                        stream_mode, data = chunk
+                    else:
+                        continue
+                else:
+                    continue
+
+                # Handle custom stream events (currently no special handling needed)
+                if stream_mode == "custom":
+                    continue
+
+                if stream_mode == "messages":
+                    message_chunk, metadata = (
+                        data if isinstance(data, tuple) else (data, {})
+                    )
+                else:
+                    # Not a recognized format
+                    continue
+
+                # Get agent from metadata tags
                 effective_agent = get_agent_from_metadata(metadata)
 
-                # Detect tool calls
-                if event_type == "on_tool_start":
-                    tool_name = event_name
-                    tool_input = event_data.get("input", {})
+                # Handle ToolMessage - tool results
+                from langchain_core.messages import ToolMessage, AIMessage
 
-                    await queue.put(
-                        {
-                            "type": "agent_tool_call",
-                            "agent": effective_agent,
-                            "tool": tool_name,
-                            "input_preview": str(tool_input)[:200],
-                        }
-                    )
+                if isinstance(message_chunk, ToolMessage):
+                    tool_name = getattr(message_chunk, "name", "")
+                    tool_status = getattr(message_chunk, "status", "success")
 
-                # Stream AI message content
-                if event_type == "on_chat_model_stream":
-                    chunk = event_data.get("chunk")
-                    if chunk and hasattr(chunk, "content") and chunk.content:
-                        text_content = extract_text_content(chunk.content)
-                        if text_content:
-                            # Replace newlines and spaces with tokens
-                            text_content = text_content.replace("\n", "|new_line|")
-                            text_content = text_content.replace(" ", "|space|")
-                            # Normalize ERPNext variations to ERP
-                            text_content = text_content.replace("ERPNext", "ERP")
-                            text_content = text_content.replace("ERP Next", "ERP")
-                            text_content = text_content.replace("ERPNEXT", "ERP")
-                            text_content = text_content.replace("erpnext", "ERP")
-
-                            # Emit stream_event for all content
-                            # Subagents include their name, orchestrator has agent=None
+                    # Show errors to help with debugging
+                    if tool_status != "success":
+                        content = (
+                            message_chunk.content
+                            if isinstance(message_chunk.content, str)
+                            else str(message_chunk.content)
+                        )
+                        if content:
                             await queue.put(
                                 {
-                                    "type": "stream_event",
-                                    "agent": effective_agent,
-                                    "content": text_content,
+                                    "type": "error",
+                                    "message": content,
                                 }
                             )
+                    continue
+
+                # Handle AIMessage chunks
+                if not isinstance(message_chunk, AIMessage):
+                    continue
+
+                # Process content - stream text immediately
+                if hasattr(message_chunk, "content") and message_chunk.content:
+                    text_content = extract_text_content(message_chunk.content)
+                    if text_content:
+                        # Replace newlines and spaces with tokens
+                        text_content = text_content.replace("\n", "|new_line|")
+                        text_content = text_content.replace(" ", "|space|")
+                        # Normalize ERPNext variations to ERP
+                        text_content = text_content.replace("ERPNext", "ERP")
+                        text_content = text_content.replace("ERP Next", "ERP")
+                        text_content = text_content.replace("ERPNEXT", "ERP")
+                        text_content = text_content.replace("erpnext", "ERP")
+
+                        await queue.put(
+                            {
+                                "type": "stream_event",
+                                "agent": effective_agent,
+                                "content": text_content,
+                            }
+                        )
+
+                # Handle tool calls from AIMessage
+                if hasattr(message_chunk, "tool_calls") and message_chunk.tool_calls:
+                    for tool_call in message_chunk.tool_calls:
+                        tool_name = tool_call.get("name", "")
+                        tool_args = tool_call.get("args", {})
+                        await queue.put(
+                            {
+                                "type": "agent_tool_call",
+                                "agent": effective_agent,
+                                "tool": tool_name,
+                                "input_preview": str(tool_args)[:200],
+                            }
+                        )
 
         except Exception as e:
             logger.error(f"Error in stream producer: {e}")

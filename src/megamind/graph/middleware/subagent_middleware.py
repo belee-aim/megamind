@@ -261,7 +261,15 @@ def _create_task_tool(
         )
 
         try:
-            result = subagent.invoke(state, runtime.config)
+            # Merge runtime config with subagent_type tag for attribution
+            # Preserve existing tags and add subagent_type
+            if runtime.config:
+                existing_tags = runtime.config.get("tags", [])
+                merged_tags = [*existing_tags, subagent_type]
+                config = {**runtime.config, "tags": merged_tags}
+            else:
+                config = {"tags": [subagent_type]}
+            result = subagent.invoke(state, config)
         except GraphInterrupt:
             # Re-raise GraphInterrupt so it propagates to pause the graph
             # This is critical for human-in-the-loop flows in nested subagents
@@ -293,11 +301,13 @@ def _create_task_tool(
 
         try:
             # Merge runtime config with subagent_type tag for attribution
-            config = (
-                {**runtime.config, "tags": [subagent_type]}
-                if runtime.config
-                else {"tags": [subagent_type]}
-            )
+            # Preserve existing tags and add subagent_type
+            if runtime.config:
+                existing_tags = runtime.config.get("tags", [])
+                merged_tags = [*existing_tags, subagent_type]
+                config = {**runtime.config, "tags": merged_tags}
+            else:
+                config = {"tags": [subagent_type]}
             result = await subagent.ainvoke(state, config)
         except GraphInterrupt:
             # Re-raise GraphInterrupt so it propagates to pause the graph
