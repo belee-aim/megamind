@@ -7,6 +7,7 @@ in the Document Management System (DMS).
 
 import json
 
+import httpx
 from langchain_core.tools import tool
 from loguru import logger
 
@@ -75,6 +76,24 @@ async def search_document(
         else:
             return str(result)
 
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Minion API error: {e.response.status_code}")
+        return json.dumps(
+            {
+                "error": f"API error: {e.response.status_code}",
+                "query": query,
+                "message": "The document search service returned an error. Please try again.",
+            }
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Minion connection error: {e}")
+        return json.dumps(
+            {
+                "error": "Connection error",
+                "query": query,
+                "message": "Could not connect to the document search service. Please try again later.",
+            }
+        )
     except Exception as e:
         logger.error(f"Document search failed: {e}")
         return json.dumps(

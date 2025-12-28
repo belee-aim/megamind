@@ -91,8 +91,11 @@ class MinionClient:
         """
         headers = {
             "Content-Type": "application/json",
-            "x-tenant-id": self.tenant_id,
         }
+
+        # Only include tenant ID if configured
+        if self.tenant_id:
+            headers["x-tenant-id"] = self.tenant_id
 
         if access_token:
             headers["Authorization"] = f"Bearer {access_token}"
@@ -145,8 +148,13 @@ class MinionClient:
             response.raise_for_status()
             result = response.json()
 
-            # Log result summary
-            result_count = len(result) if isinstance(result, list) else result.get("count", "unknown")
+            # Log result summary - handle various response types safely
+            if isinstance(result, list):
+                result_count = len(result)
+            elif isinstance(result, dict):
+                result_count = result.get("count", len(result.get("results", [])))
+            else:
+                result_count = "unknown"
             logger.info(f"Document search completed: {result_count} results")
 
             return result
